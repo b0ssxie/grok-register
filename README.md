@@ -150,6 +150,10 @@ GUI 数量控件可能有上限。CLI 模式直接读取 `config.json` 中的 `r
 └── README.md
 ```
 
+## License
+
+[MIT](LICENSE).
+
 ## Star History
 
 <a href="https://www.star-history.com/AaronL725/grok-register#history">

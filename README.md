@@ -291,6 +291,7 @@ GUI 模式会打开 Tkinter 窗口，适合手动调整配置和观察日志。
 - `mail_credentials.txt`：临时邮箱凭证。
 - `cpa_auths/xai-*.json`：可选导出的 CPA xAI OAuth 凭证。
 - `cpa_auths/cpa_auth_failed.txt`：OIDC 导出失败记录。
+- `screenshots/`：CPA/OIDC 浏览器失败调试截图，已被 `.gitignore` 忽略。
 - `*.log`：可选日志文件。
 
 这些文件包含敏感信息，已被 `.gitignore` 忽略。
@@ -321,10 +322,14 @@ GUI 数量控件可能有上限。CLI 模式直接读取 `config.json` 中的 `r
 
 ```text
 .
-├── grok_register_ttk.py   # 主程序
+├── grok_register_ttk.py   # 主程序（GUI / CLI）
+├── cpa_export.py          # 注册成功后的 CPA/OIDC 导出入口
+├── cpa_xai/               # xAI Device Auth、浏览器授权和凭证写入模块
 ├── cf_mail_debug.py       # Cloudflare 邮箱调试工具
 ├── config.example.json    # 配置示例
 ├── requirements.txt       # Python 依赖
+├── tests/                 # 现有测试用例
+├── assets/                # README 资源
 └── README.md
 ```
 

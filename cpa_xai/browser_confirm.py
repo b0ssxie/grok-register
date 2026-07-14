@@ -189,10 +189,11 @@ def create_standalone_page(proxy: Optional[str] = None, headless: bool = False, 
                 pass
             break
 
-    from .proxyutil import proxy_for_chromium, proxy_log_label, resolve_proxy
+    from .proxyutil import prepare_chromium_proxy, proxy_log_label, resolve_proxy
 
     resolved = resolve_proxy(proxy)
-    chrome_proxy = proxy_for_chromium(resolved)
+    proxy_bridge = None
+    chrome_proxy, proxy_bridge = prepare_chromium_proxy(resolved, log=logger)
     if chrome_proxy:
         options.set_argument("--proxy-server=%s" % chrome_proxy)
         logger("browser proxy=%s (chromium %s)" % (proxy_log_label(resolved), chrome_proxy))
@@ -200,19 +201,50 @@ def create_standalone_page(proxy: Optional[str] = None, headless: bool = False, 
         logger("browser proxy=(none)")
 
     browser = Chromium(options)
+    if proxy_bridge is not None:
+        try:
+            setattr(browser, "_cpa_proxy_bridge", proxy_bridge)
+        except Exception:
+            pass
+    _register_mint_browser(browser)
     page = browser.latest_tab
     logger("standalone chromium started")
     return browser, page
 
 
 def close_standalone(browser: Any) -> None:
+    if browser is None:
+        return
+    _unregister_mint_browser(browser)
+    bridge = getattr(browser, "_cpa_proxy_bridge", None)
     try:
         browser.quit()
     except Exception:
         pass
+    if bridge is not None:
+        try:
+            bridge.stop()
+        except Exception:
+            pass
 
 
 _mint_tls = threading.local()
+_mint_registry_lock = threading.Lock()
+_mint_registry = set()
+
+
+def _register_mint_browser(browser: Any) -> None:
+    if browser is None:
+        return
+    with _mint_registry_lock:
+        _mint_registry.add(browser)
+
+
+def _unregister_mint_browser(browser: Any) -> None:
+    if browser is None:
+        return
+    with _mint_registry_lock:
+        _mint_registry.discard(browser)
 
 
 def _mint_tls_get():
@@ -417,8 +449,9 @@ def release_mint_browser(owned: bool, success: bool, log: Optional[LogFn] = None
 
 def shutdown_mint_browsers() -> None:
     state = _mint_tls_get()
-    browser = state.get("browser")
-    if browser is not None:
+    with _mint_registry_lock:
+        browsers = list(_mint_registry)
+    for browser in browsers:
         try:
             close_standalone(browser)
         except Exception:
@@ -824,7 +857,7 @@ def mint_with_browser(
                 session = request_device_code(proxy=resolved or None)
                 last_error = None
                 break
-            except BaseException as exc:
+            except Exception as exc:
                 last_error = exc
                 logger("request_device_code attempt %s/3 failed: %s" % (attempt, exc))
                 _sleep(1.5 * attempt)
@@ -852,22 +885,28 @@ def mint_with_browser(
         token_box = {}
         error_box = {}
 
+        def combined_cancel():
+            return stop_event.is_set() or bool(cancel and cancel())
+
         def _poll() -> None:
             try:
-                time.sleep(2)
+                for _ in range(20):
+                    if combined_cancel():
+                        raise OAuthDeviceError("cancelled")
+                    time.sleep(0.1)
                 result = poll_device_token(
                     session.device_code,
                     token_endpoint=session.token_endpoint,
                     interval=max(session.interval, 5),
                     expires_in=min(session.expires_in, int(browser_timeout_sec) + 60),
                     log=logger,
-                    cancel=cancel,
+                    cancel=combined_cancel,
                     proxy=resolved or None,
                 )
                 token_box["token"] = result
                 stop_event.set()
                 logger("token poll SUCCESS — stop_event set")
-            except BaseException as exc:
+            except Exception as exc:
                 error_box["err"] = exc
                 stop_event.set()
 
@@ -897,8 +936,16 @@ def mint_with_browser(
             )
             if hard:
                 stop_event.set()
+                thread.join(timeout=5)
+                if thread.is_alive():
+                    logger("token poll thread did not stop within 5s after browser failure")
                 raise
         thread.join(timeout=max(browser_timeout_sec, 60) + 30)
+        if thread.is_alive():
+            stop_event.set()
+            thread.join(timeout=5)
+            if thread.is_alive():
+                raise OAuthDeviceError("token poll thread did not stop after timeout")
         if "token" in token_box:
             token_result = token_box["token"]
             success = True

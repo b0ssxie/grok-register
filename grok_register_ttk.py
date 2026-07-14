@@ -1,12 +1,22 @@
-﻿#!/usr/bin/env python
+#!/usr/bin/env python
 # -*- coding: utf-8 -*-
 """
 Grok 注册机 - TTK GUI 版本
 整合 DrissionPage_example.py, openai_register.py, batch_open_nsfw.py
 """
 
-import tkinter as tk
-from tkinter import ttk, messagebox, scrolledtext
+try:
+    import tkinter as tk
+    from tkinter import ttk, messagebox, scrolledtext
+    TK_AVAILABLE = True
+    TK_IMPORT_ERROR = None
+except ImportError as exc:
+    tk = None
+    ttk = None
+    messagebox = None
+    scrolledtext = None
+    TK_AVAILABLE = False
+    TK_IMPORT_ERROR = exc
 import threading
 import datetime
 import time
@@ -58,11 +68,11 @@ DEFAULT_CONFIG = {
     "cloudmail_public_token": "",
     "cloudmail_domains": "",
     "cloudmail_path_messages": "/api/public/emailList",
-    "proxy": "http://127.0.0.1:7890",
+    "proxy": "",
     "enable_nsfw": True,
     "register_count": 1,
     "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
-    "grok2api_auto_add_local": True,
+    "grok2api_auto_add_local": False,
     "grok2api_local_token_file": "",
     "grok2api_pool_name": "ssoBasic",
     "grok2api_auto_add_remote": False,
@@ -100,9 +110,15 @@ def load_config():
         try:
             with open(CONFIG_FILE, "r", encoding="utf-8") as f:
                 loaded = json.load(f)
+            if not isinstance(loaded, dict):
+                raise ValueError("config root must be a JSON object")
             config = {**DEFAULT_CONFIG, **loaded}
-        except Exception:
-            config = DEFAULT_CONFIG.copy()
+        except Exception as exc:
+            message = f"配置文件解析失败: {CONFIG_FILE}: {exc}"
+            print(f"[!] {message}", file=sys.stderr)
+            raise SystemExit(message)
+    else:
+        config = DEFAULT_CONFIG.copy()
     return config
 
 
@@ -647,38 +663,68 @@ def add_token_to_grok2api_local_pool(raw_token, email="", log_callback=None):
     token = _normalize_sso_token(raw_token)
     if not token:
         return False
-    token_file = resolve_grok2api_local_token_file()
-    pool_name = str(config.get("grok2api_pool_name", "ssoBasic") or "ssoBasic").strip()
-    if not pool_name:
-        pool_name = "ssoBasic"
-    os.makedirs(os.path.dirname(token_file), exist_ok=True)
-    data = {}
-    if os.path.exists(token_file):
-        try:
-            with open(token_file, "r", encoding="utf-8") as f:
-                data = json.load(f) or {}
-        except Exception:
-            data = {}
-    if not isinstance(data, dict):
+    token_file = os.path.abspath(resolve_grok2api_local_token_file())
+    pool_name = str(config.get("grok2api_pool_name", "ssoBasic") or "ssoBasic").strip() or "ssoBasic"
+    parent = os.path.dirname(token_file)
+    os.makedirs(parent, exist_ok=True)
+    lock_path = token_file + ".lock"
+    try:
+        from filelock import FileLock
+    except Exception as exc:
+        raise RuntimeError(f"filelock 依赖不可用，拒绝非原子写入 token 池: {exc}")
+    with FileLock(lock_path, timeout=30):
         data = {}
-    pool = data.get(pool_name)
-    if not isinstance(pool, list):
-        pool = []
-    existing = set()
-    for item in pool:
-        if isinstance(item, str):
-            existing.add(_normalize_sso_token(item))
-        elif isinstance(item, dict):
-            existing.add(_normalize_sso_token(item.get("token", "")))
-    if token in existing:
-        if log_callback:
-            log_callback(f"[*] grok2api 本地池已存在 token: {pool_name}")
-        return True
-    entry = {"token": token, "tags": ["auto-register"], "note": email}
-    pool.append(entry)
-    data[pool_name] = pool
-    with open(token_file, "w", encoding="utf-8") as f:
-        json.dump(data, f, ensure_ascii=False, indent=2)
+        if os.path.exists(token_file):
+            try:
+                with open(token_file, "r", encoding="utf-8") as f:
+                    data = json.load(f) or {}
+            except Exception as exc:
+                broken_path = token_file + f".broken-{int(time.time())}"
+                try:
+                    os.replace(token_file, broken_path)
+                except Exception:
+                    broken_path = token_file
+                raise RuntimeError(f"本地 token 文件 JSON 解析失败，已停止写入以避免覆盖: {broken_path}: {exc}")
+        if not isinstance(data, dict):
+            raise RuntimeError("本地 token 文件根节点不是 JSON object，拒绝覆盖")
+        pool = data.get(pool_name)
+        if not isinstance(pool, list):
+            pool = []
+        existing = set()
+        for item in pool:
+            if isinstance(item, str):
+                existing.add(_normalize_sso_token(item))
+            elif isinstance(item, dict):
+                existing.add(_normalize_sso_token(item.get("token", "")))
+        if token in existing:
+            if log_callback:
+                log_callback(f"[*] grok2api 本地池已存在 token: {pool_name}")
+            return True
+        pool.append({"token": token, "tags": ["auto-register"], "note": email})
+        data[pool_name] = pool
+        if os.path.exists(token_file):
+            backup_path = token_file + ".bak"
+            try:
+                with open(token_file, "rb") as src, open(backup_path, "wb") as dst:
+                    dst.write(src.read())
+                    dst.flush()
+                    os.fsync(dst.fileno())
+            except Exception as exc:
+                raise RuntimeError(f"创建本地 token 备份失败，拒绝继续写入: {exc}")
+        temp_path = token_file + ".tmp"
+        try:
+            with open(temp_path, "w", encoding="utf-8") as f:
+                json.dump(data, f, ensure_ascii=False, indent=2)
+                f.write("\n")
+                f.flush()
+                os.fsync(f.fileno())
+            os.replace(temp_path, token_file)
+        finally:
+            if os.path.exists(temp_path):
+                try:
+                    os.unlink(temp_path)
+                except Exception:
+                    pass
     if log_callback:
         log_callback(f"[+] 已写入 grok2api 本地池: {pool_name} ({token_file})")
     return True
@@ -751,21 +797,30 @@ def add_token_to_grok2api_remote_pool(raw_token, email="", log_callback=None):
     if log_callback:
         log_callback(f"[Debug] /tokens/add 写入失败，尝试 /tokens 全量模式: {'; '.join(add_errors)}")
 
-    # 兜底：旧版全量保存接口
+    # 兜底：旧版全量保存接口。必须先成功读取远端旧状态，避免空池覆盖。
     current = {}
     fallback_base = api_bases[0] if api_bases else base
+    loaded_remote_state = False
+    load_errors = []
     for api_base in api_bases or [base]:
         try:
             resp = http_get(f"{api_base}/tokens", headers=headers, params=query, timeout=20)
             if resp.status_code == 200:
                 payload = resp.json()
-                current = payload.get("tokens", {}) if isinstance(payload, dict) else {}
-                fallback_base = api_base
-                break
-        except Exception:
-            continue
-    if not isinstance(current, dict):
-        current = {}
+                if isinstance(payload, dict):
+                    candidate = payload.get("tokens") if "tokens" in payload else payload
+                    if isinstance(candidate, dict):
+                        current = candidate
+                        fallback_base = api_base
+                        loaded_remote_state = True
+                        break
+                load_errors.append(f"{api_base}/tokens: unexpected payload")
+            else:
+                load_errors.append(f"{api_base}/tokens: HTTP {resp.status_code}")
+        except Exception as exc:
+            load_errors.append(f"{api_base}/tokens: {exc}")
+    if not loaded_remote_state:
+        raise RuntimeError("无法安全读取远端 token 池，拒绝执行全量覆盖: " + "; ".join(load_errors))
     pool = current.get(pool_name)
     if not isinstance(pool, list):
         pool = []
@@ -874,7 +929,7 @@ def http_post(url, **kwargs):
 
 def raise_if_cancelled(cancel_callback=None):
     if cancel_callback and cancel_callback():
-        raise RegistrationCancelled("鐢ㄦ埛鍋滄娉ㄥ唽")
+        raise RegistrationCancelled("用户停止注册")
 
 
 def sleep_with_cancel(seconds, cancel_callback=None):
@@ -1063,7 +1118,7 @@ def yyds_create_account(address=None, domain=None, api_key=None, jwt=None):
     data = resp.json()
     if data.get("success"):
         return data.get("data", {})
-    raise Exception(f"YYDS 鍒涘缓閭澶辫触: {data}")
+    raise Exception(f"YYDS 创建邮箱失败: {data}")
 
 
 def yyds_get_token(address, api_key=None, jwt=None):
@@ -1809,7 +1864,7 @@ def tk_entry(parent, textvariable=None, width=30, **kwargs):
     )
 
 
-def tk_button(parent, text="", command=None, state=tk.NORMAL, **kwargs):
+def tk_button(parent, text="", command=None, state="normal", **kwargs):
     return tk.Button(
         parent,
         text=text,
@@ -2822,6 +2877,8 @@ def wait_for_sso_cookie(timeout=120, log_callback=None, cancel_callback=None):
     final_no_submit_state = ""
     final_no_submit_since = None
     final_no_submit_timeout = 25
+    last_wait_exception_message = ""
+    last_wait_exception_at = 0.0
 
     while time.time() < deadline:
         raise_if_cancelled(cancel_callback)
@@ -2948,8 +3005,14 @@ return String(cfInput.value || '').trim().length;
             refresh_active_page()
         except AccountRetryNeeded:
             raise
-        except Exception:
-            pass
+        except Exception as exc:
+            if log_callback:
+                now = time.time()
+                message = f"{exc.__class__.__name__}: {exc}"
+                if message != last_wait_exception_message or now - last_wait_exception_at >= 10:
+                    log_callback(f"[Debug] 等待 sso cookie 时出现异常，将继续等待: {message}")
+                    last_wait_exception_message = message
+                    last_wait_exception_at = now
 
         sleep_with_cancel(1, cancel_callback)
 
@@ -3647,6 +3710,10 @@ def main_cli():
 def main():
     if len(sys.argv) > 1 and sys.argv[1].strip().lower() in ("start", "cli", "--cli"):
         main_cli()
+        return
+    if not TK_AVAILABLE:
+        print(f"[!] GUI 模式需要 Tkinter，但当前环境不可用: {TK_IMPORT_ERROR}", file=sys.stderr)
+        print("[*] 可改用 CLI 模式: python grok_register_ttk.py cli", file=sys.stderr)
         return
     root = tk.Tk()
     setup_light_theme(root)

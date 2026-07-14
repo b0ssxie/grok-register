@@ -24,3 +24,5 @@ autoPortData/
 cpa_auths/
 xai-*.json
 cpa_auth_failed.txt
+screenshots/
+*.png

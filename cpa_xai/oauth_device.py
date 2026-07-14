@@ -167,7 +167,7 @@ def _post_form(url, form, timeout=30.0, proxy=None, retries=0, retry_sleep=1.5):
         except urllib.error.HTTPError as exc:
             body = exc.read().decode("utf-8", errors="replace")
             status = int(exc.code)
-        except BaseException as exc:
+        except Exception as exc:
             last_error = exc
             if not _is_transient_net_error(exc) or attempt >= int(retries):
                 raise
@@ -216,6 +216,14 @@ def request_device_code(client_id=CLIENT_ID, scope=SCOPE, timeout=30.0, proxy=No
     )
 
 
+def _sleep_with_cancel(seconds, cancel=None):
+    deadline = time.time() + max(float(seconds), 0.0)
+    while time.time() < deadline:
+        if cancel and cancel():
+            raise OAuthDeviceError("cancelled")
+        time.sleep(min(0.2, max(deadline - time.time(), 0.0)))
+
+
 def poll_device_token(
     device_code,
     token_endpoint,
@@ -249,7 +257,7 @@ def poll_device_token(
                 retry_sleep=1.0,
             )
             net_streak = 0
-        except BaseException as exc:
+        except Exception as exc:
             if not _is_transient_net_error(exc):
                 raise
             net_streak += 1
@@ -257,7 +265,7 @@ def poll_device_token(
             logger("oauth poll network blip (%s/%s): %s — retry in %ss" % (net_streak, max_net_streak, exc, wait_seconds))
             if net_streak >= max_net_streak:
                 raise OAuthDeviceError("device auth aborted after %s network errors: %s" % (net_streak, exc))
-            time.sleep(wait_seconds)
+            _sleep_with_cancel(wait_seconds, cancel)
             continue
         if status == 200 and isinstance(payload, dict) and payload.get("access_token"):
             access_token = str(payload.get("access_token") or "").strip()
@@ -281,7 +289,7 @@ def poll_device_token(
             if error_code == "slow_down":
                 sleep_seconds = min(sleep_seconds + 5, 30)
             logger("oauth poll: %s (sleep %ss)" % (error_code, sleep_seconds))
-            time.sleep(sleep_seconds)
+            _sleep_with_cancel(sleep_seconds, cancel)
             continue
         if error_code in ("expired_token", "access_denied"):
             raise OAuthDeviceError("device auth failed: %s: %s" % (error_code, error_description))
@@ -293,8 +301,8 @@ def poll_device_token(
             logger("oauth poll soft HTTP %s: %r — retry in %ss" % (status, payload, wait_seconds))
             if net_streak >= max_net_streak:
                 raise OAuthDeviceError("device auth aborted after repeated soft HTTP failures status=%s" % status)
-            time.sleep(wait_seconds)
+            _sleep_with_cancel(wait_seconds, cancel)
             continue
         logger("oauth poll unexpected HTTP %s: %r" % (status, payload))
-        time.sleep(sleep_seconds)
+        _sleep_with_cancel(sleep_seconds, cancel)
     raise OAuthDeviceError("device auth timed out waiting for user approval")

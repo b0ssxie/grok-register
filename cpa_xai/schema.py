@@ -87,6 +87,8 @@ def build_cpa_xai_auth(
     expired = ""
     if exp:
         expired = datetime.fromtimestamp(exp, tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
+    elif expires_in:
+        expired = datetime.fromtimestamp(time.time() + int(expires_in or 0), tz=timezone.utc).strftime("%Y-%m-%dT%H:%M:%SZ")
     payload = {
         "type": "xai",
         "access_token": access,

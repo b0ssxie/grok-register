@@ -462,6 +462,19 @@ def setup_light_theme(root):
         style.configure("TEntry", fieldbackground=UI_ENTRY_BG, foreground=UI_FG)
         style.configure("TCombobox", fieldbackground=UI_ENTRY_BG, foreground=UI_FG)
         style.configure("TSpinbox", fieldbackground=UI_ENTRY_BG, foreground=UI_FG)
+        style.configure("TNotebook", background=UI_BG, borderwidth=0)
+        style.configure(
+            "TNotebook.Tab",
+            background=UI_BUTTON_BG,
+            foreground=UI_FG,
+            padding=[12, 4],
+        )
+        style.map(
+            "TNotebook.Tab",
+            background=[("selected", UI_PANEL_BG), ("active", UI_ACTIVE_BG)],
+            foreground=[("selected", UI_FG), ("active", UI_FG)],
+        )
+        style.configure("Tab.TFrame", background=UI_PANEL_BG)
     except Exception:
         pass
 
@@ -678,8 +691,8 @@ class GrokRegisterGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Grok 注册机")
-        self.root.geometry("1120x900")
-        self.root.minsize(960, 700)
+        self.root.geometry("1000x720")
+        self.root.minsize(880, 600)
         self.is_running = False
         self.batch_count = 0
         self.success_count = 0

@@ -1,6 +1,6 @@
 <div align="center">
 
-[![Grok Register — GUI and CLI registration automation toolkit](assets/banner.png)](https://github.com/AaronL725/grok-register)
+[![Grok Register — GUI and CLI registration automation toolkit](assets/banner.png)](https://github.com/b0ssxie/grok-register)
 
 Grok Register 是一个面向自动化流程研究、测试环境验证和个人学习的 Python 工具。项目提供 GUI / CLI、四种临时邮箱接入、Chromium 页面自动化、账号安全落盘、pending 恢复、grok2api token 入池，以及可选的 CPA xAI OIDC 凭证导出。
 
@@ -16,9 +16,9 @@ Grok Register 是一个面向自动化流程研究、测试环境验证和个人
 <p align="center">
  <a href="https://www.star-history.com/aaronl725/grok-register">
   <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/badge?repo=AaronL725/grok-register&theme=dark" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/badge?repo=AaronL725/grok-register" />
-   <img alt="Star History Rank" src="https://api.star-history.com/badge?repo=AaronL725/grok-register" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/badge?repo=b0ssxie/grok-register&theme=dark" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/badge?repo=b0ssxie/grok-register" />
+   <img alt="Star History Rank" src="https://api.star-history.com/badge?repo=b0ssxie/grok-register" />
   </picture>
  </a>
 </p>
@@ -57,6 +57,8 @@ Grok Register 是一个面向自动化流程研究、测试环境验证和个人
 - 成功账号实时写入 `accounts_*.txt`。
 - 主结果写入失败时自动写入 `*.pending.jsonl`，可稍后幂等恢复。
 - 支持将 SSO token 写入 grok2api 本地池和远端池。
+- 支持代理池（`proxy_pool`），每账号轮换代理，降低限速风险。
+- 支持注册后自动导入 9Router Grok CLI provider。
 - 支持注册成功后可选导出 CLIProxyAPI 使用的 CPA xAI OIDC 凭证。
 - 支持注册后尝试开启 NSFW；失败不会影响账号保存。
 - 支持浏览器重启、卡住重试、邮箱更换、定期内存清理和安全取消。
@@ -96,7 +98,7 @@ Grok Register 是一个面向自动化流程研究、测试环境验证和个人
 克隆仓库：
 
 ```bash
-git clone https://github.com/AaronL725/grok-register.git
+git clone https://github.com/b0ssxie/grok-register.git
 cd grok-register
 ```
 
@@ -488,10 +490,10 @@ Thanks to [linux.do](https://linux.do) — a vibrant tech community where this p
 
 ## Star History
 
-<a href="https://www.star-history.com/?repos=AaronL725%2Fgrok-register&type=date&legend=top-left">
+<a href="https://www.star-history.com/?repos=b0ssxie%2Fgrok-register&type=date&legend=top-left">
  <picture>
-   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=AaronL725/grok-register&type=date&theme=dark&legend=top-left&sealed_token=uCM--S2xEp0n8rFUZHUg6wUJOgYcfO4XEVCIF9UZAT04YjL9YsMEOVOGAOlQfqwsoS7cQef0Rwc1cYCY4lAmTuMmcg-hKzNnx1A7KNekuCXQotFd4YifLIkvJWOEy5vxiREJX80Mwxbr8F-3GfCv0utIsQz_iq19nS57svUqwv0mSosV8OTxqXTLjmsI" />
-   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=AaronL725/grok-register&type=date&legend=top-left&sealed_token=uCM--S2xEp0n8rFUZHUg6wUJOgYcfO4XEVCIF9UZAT04YjL9YsMEOVOGAOlQfqwsoS7cQef0Rwc1cYCY4lAmTuMmcg-hKzNnx1A7KNekuCXQotFd4YifLIkvJWOEy5vxiREJX80Mwxbr8F-3GfCv0utIsQz_iq19nS57svUqwv0mSosV8OTxqXTLjmsI" />
-   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=AaronL725/grok-register&type=date&legend=top-left&sealed_token=uCM--S2xEp0n8rFUZHUg6wUJOgYcfO4XEVCIF9UZAT04YjL9YsMEOVOGAOlQfqwsoS7cQef0Rwc1cYCY4lAmTuMmcg-hKzNnx1A7KNekuCXQotFd4YifLIkvJWOEy5vxiREJX80Mwxbr8F-3GfCv0utIsQz_iq19nS57svUqwv0mSosV8OTxqXTLjmsI" />
+   <source media="(prefers-color-scheme: dark)" srcset="https://api.star-history.com/chart?repos=b0ssxie/grok-register&type=date&theme=dark&legend=top-left&sealed_token=uCM--S2xEp0n8rFUZHUg6wUJOgYcfO4XEVCIF9UZAT04YjL9YsMEOVOGAOlQfqwsoS7cQef0Rwc1cYCY4lAmTuMmcg-hKzNnx1A7KNekuCXQotFd4YifLIkvJWOEy5vxiREJX80Mwxbr8F-3GfCv0utIsQz_iq19nS57svUqwv0mSosV8OTxqXTLjmsI" />
+   <source media="(prefers-color-scheme: light)" srcset="https://api.star-history.com/chart?repos=b0ssxie/grok-register&type=date&legend=top-left&sealed_token=uCM--S2xEp0n8rFUZHUg6wUJOgYcfO4XEVCIF9UZAT04YjL9YsMEOVOGAOlQfqwsoS7cQef0Rwc1cYCY4lAmTuMmcg-hKzNnx1A7KNekuCXQotFd4YifLIkvJWOEy5vxiREJX80Mwxbr8F-3GfCv0utIsQz_iq19nS57svUqwv0mSosV8OTxqXTLjmsI" />
+   <img alt="Star History Chart" src="https://api.star-history.com/chart?repos=b0ssxie/grok-register&type=date&legend=top-left&sealed_token=uCM--S2xEp0n8rFUZHUg6wUJOgYcfO4XEVCIF9UZAT04YjL9YsMEOVOGAOlQfqwsoS7cQef0Rwc1cYCY4lAmTuMmcg-hKzNnx1A7KNekuCXQotFd4YifLIkvJWOEy5vxiREJX80Mwxbr8F-3GfCv0utIsQz_iq19nS57svUqwv0mSosV8OTxqXTLjmsI" />
  </picture>
 </a>

@@ -1,9 +1,12 @@
 """管理主注册浏览器生命周期并实现注册页面自动化操作。"""
 import gc
+import os
 import random
 import re
 import secrets
+import signal
 import struct
+import subprocess
 import time
 
 from DrissionPage import Chromium
@@ -196,8 +199,21 @@ def stop_browser_proxy_bridge():
             pass
     browser_proxy_bridge = None
 
+def _kill_browser_process(pid):
+    if not pid:
+        return
+    try:
+        os.kill(pid, signal.SIGTERM)
+    except (OSError, AttributeError):
+        pass
+    try:
+        subprocess.run(["taskkill", "/F", "/PID", str(pid)], capture_output=True, timeout=3)
+    except Exception:
+        pass
+
 def start_browser(log_callback=None, use_proxy=True):
     global browser, page, browser_proxy_bridge, browser_started_with_proxy
+    stop_browser()
     last_exc = None
     if use_proxy:
         cycle_proxy()
@@ -243,7 +259,12 @@ def start_browser(log_callback=None, use_proxy=True):
 
 def stop_browser():
     global browser, page, browser_started_with_proxy
+    pid = None
     if browser is not None:
+        try:
+            pid = browser.process_id
+        except Exception:
+            pass
         try:
             browser.quit(del_data=True)
         except Exception:
@@ -252,6 +273,9 @@ def stop_browser():
     browser = None
     page = None
     browser_started_with_proxy = False
+    if pid:
+        time.sleep(0.5)
+        _kill_browser_process(pid)
 
 def restart_browser(log_callback=None, use_proxy=True):
     stop_browser()

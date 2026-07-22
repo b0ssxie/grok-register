@@ -384,7 +384,7 @@ def approve_device_code(
                 _dismiss_cookie_banner(page, logger)
                 _sleep(0.6)
                 continue
-            if _click_exact(page, ["允许", "Allow", "Authorize", "Approve"], logger, real=True):
+            if _click_exact(page, ["允许", "Allow", "Authorize", "Approve", "确认", "授权", "同意", "Continue"], logger, real=True):
                 _sleep(2.5)
                 continue
             try:
@@ -408,7 +408,7 @@ def approve_device_code(
                     actionInput.value = 'allow';
                     const button = [...form.querySelectorAll('button')].find((b) => {
                       const text = (b.innerText || '').trim();
-                      return text === '允许' || text === 'Allow' || text === 'Authorize' || text === 'Approve';
+                      return text === '允许' || text === 'Allow' || text === 'Authorize' || text === 'Approve' || text === '确认' || text === '授权' || text === '同意';
                     });
                     if (button) button.click();
                     else form.submit();
@@ -416,7 +416,29 @@ def approve_device_code(
                 )
                 _sleep(2.5)
             except Exception as exc:
-                logger("consent fallback failed: %s" % exc)
+                logger("consent form fallback failed: %s" % exc)
+            # 兜底：点页面上可见的任何一个按钮
+            try:
+                clicked = page.run_js(
+                    """
+                    const buttons = document.querySelectorAll('button, [role="button"], input[type="submit"], [type="submit"]');
+                    for (const el of buttons) {
+                        if (el.offsetParent === null) continue;
+                        const text = (el.innerText || el.value || '').trim().toLowerCase();
+                        if (!text || /cookie|隐私|preference/i.test(text)) continue;
+                        el.click();
+                        return text;
+                    }
+                    return '';
+                    """
+                )
+                if clicked:
+                    logger("consent catch-all clicked: %s" % str(clicked).strip())
+                    _sleep(2.5)
+                    continue
+            except Exception as exc:
+                logger("consent catch-all failed: %s" % exc)
+            logger("consent page text: %s" % text[:200])
             continue
         if page.ele("css:input[name='user_code']", timeout=0.3) and "consent" not in url:
             phase = "device"

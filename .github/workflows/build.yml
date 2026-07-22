@@ -31,18 +31,7 @@ jobs:
           pip install pyinstaller
 
       - name: Build single-file GUI
-        run: |
-          pyinstaller --onefile --windowed --name GrokRegister `
-            --add-data "turnstilePatch;turnstilePatch" `
-            --hidden-import cpa_xai `
-            --hidden-import cpa_xai.mint `
-            --hidden-import cpa_xai.browser_session `
-            --hidden-import cpa_xai.browser_confirm `
-            --hidden-import cpa_xai.oauth_device `
-            --hidden-import cpa_xai.proxyutil `
-            --hidden-import cpa_xai.writer `
-            --hidden-import cpa_xai.schema `
-            grok_register_ttk.py
+        run: pyinstaller --onefile --windowed --name GrokRegister --add-data "turnstilePatch;turnstilePatch" --hidden-import cpa_xai --hidden-import cpa_xai.mint --hidden-import cpa_xai.browser_session --hidden-import cpa_xai.browser_confirm --hidden-import cpa_xai.oauth_device --hidden-import cpa_xai.proxyutil --hidden-import cpa_xai.writer --hidden-import cpa_xai.schema grok_register_ttk.py
 
       - name: Create Release
         uses: softprops/action-gh-release@v2

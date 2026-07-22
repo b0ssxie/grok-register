@@ -660,10 +660,17 @@ def mint_with_browser(
         if "token" in token_box:
             token_result = token_box["token"]
             success = True
-            try:
-                work_page.close()
-            except Exception:
-                pass
+            # owned=False 时复用浏览器，不能 close 唯一标签页，否则下次 clear_page_session 拿到死 page
+            if owned:
+                try:
+                    work_page.close()
+                except Exception:
+                    pass
+            else:
+                try:
+                    work_page.get("about:blank")
+                except Exception:
+                    pass
             return {
                 "access_token": token_result.access_token,
                 "refresh_token": token_result.refresh_token,

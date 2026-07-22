@@ -366,8 +366,14 @@ def approve_device_code(
                 message = "%s shot=%s" % (auth_error, shot)
             raise BrowserConfirmError("auth failed: %s" % message)
         if "device/done" in url or "设备已授权" in text or "device authorized" in text.lower():
+            if stop_event is not None and stop_event.is_set():
+                logger("device done page — token done, return")
+                return
             logger("device done page — waiting for token poll")
             _sleep(1.5)
+            if stop_event is not None and stop_event.is_set():
+                logger("device done page — token done after sleep, return")
+                return
             continue
         if "Invalid action" in text:
             page.get(verification_uri_complete)
@@ -654,6 +660,10 @@ def mint_with_browser(
         if "token" in token_box:
             token_result = token_box["token"]
             success = True
+            try:
+                work_page.close()
+            except Exception:
+                pass
             return {
                 "access_token": token_result.access_token,
                 "refresh_token": token_result.refresh_token,

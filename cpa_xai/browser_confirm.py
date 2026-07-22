@@ -679,6 +679,10 @@ def mint_with_browser(
     finally:
         if own_browser is not None:
             if owned:
+                logger("[cpa] closing own CPA browser")
                 close_standalone(own_browser)
             else:
+                logger("[cpa] releasing shared CPA browser")
                 release_mint_browser(owned=False, success=success, log=logger)
+        else:
+            logger("[cpa] no own browser to close")

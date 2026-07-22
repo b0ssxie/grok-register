@@ -568,10 +568,11 @@ def maybe_export_cpa_xai_after_success(email, password, sso="", log_callback=Non
     if not bool(config.get("cpa_export_enabled", False)):
         return {"ok": False, "skipped": True, "reason": "disabled"}
     logger = log_callback or (lambda message: None)
+    logger("[cpa] starting CPA OIDC export")
     try:
         from cpa_export import export_cpa_xai_for_account
     except Exception as exc:
-        logger(f"[!] CPA 模块导入失败，已跳过 OIDC 导出: {exc}")
+        logger(f"[cpa] import failed: {exc}")
         return {"ok": False, "error": str(exc)}
     current_page = None
     try:

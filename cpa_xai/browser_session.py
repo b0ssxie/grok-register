@@ -303,14 +303,17 @@ def acquire_mint_browser(proxy: Optional[str] = None, headless: bool = False, re
     logger = log or _noop_log
     state = _mint_tls_get()
     if not reuse:
+        logger("[cpa] standalone CPA browser (no reuse)")
         browser, page = create_standalone_page(proxy=proxy, headless=headless, log=logger)
         return browser, page, True
     proxy_key = str(proxy or "")
     if state["browser"] is None:
+        logger("[cpa] new CPA browser (first use)")
         browser, page = create_standalone_page(proxy=proxy, headless=headless, log=logger)
         state.update({"browser": browser, "page": page, "served": 0, "proxy": proxy_key, "headless": bool(headless)})
         return browser, page, False
     if state["proxy"] != proxy_key or bool(state["headless"]) != bool(headless):
+        logger("[cpa] recreate CPA browser (proxy/headless changed)")
         try:
             close_standalone(state["browser"])
         except Exception:
@@ -323,9 +326,11 @@ def acquire_mint_browser(proxy: Optional[str] = None, headless: bool = False, re
             close_standalone(state["browser"])
         except Exception:
             pass
+        logger("[cpa] recycle CPA browser (served %d)" % state["served"])
         browser, page = create_standalone_page(proxy=proxy, headless=headless, log=logger)
         state.update({"browser": browser, "page": page, "served": 0, "proxy": proxy_key, "headless": bool(headless)})
         return browser, page, False
+    logger("[cpa] reuse CPA browser (served %d)" % state["served"])
     clear_page_session(state["page"], browser=state["browser"], log=logger)
     return state["browser"], state["page"], False
 

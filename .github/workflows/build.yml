@@ -42,9 +42,21 @@ jobs:
           name: GrokRegister-${{ github.ref_name }}
           path: dist/GrokRegister.exe
 
-      - name: Create Release
-        if: startsWith(github.ref, 'refs/tags/')
+      - name: Release tag (v*)
+        if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v2
         with:
           files: dist/GrokRegister.exe
           generate_release_notes: true
+          make_latest: true
+
+      - name: Release latest (main)
+        if: github.ref == 'refs/heads/main'
+        uses: softprops/action-gh-release@v2
+        with:
+          tag_name: latest
+          name: Latest
+          files: dist/GrokRegister.exe
+          generate_release_notes: true
+          prerelease: true
+          make_latest: true

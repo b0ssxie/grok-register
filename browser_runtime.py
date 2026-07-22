@@ -120,14 +120,18 @@ def page_has_proxy_error(page_obj):
         url = str(getattr(page_obj, "url", "") or "")
         title = str(page_obj.run_js("return document.title || ''") or "")
         body = str(page_obj.run_js("return document.body ? document.body.innerText.slice(0, 2000) : ''") or "")
+        html = str(getattr(page_obj, "html", "") or "")[:1500]
     except Exception:
         return False
-    text = "%s\n%s\n%s" % (url, title, body)
-    text = text.lower()
+    text = ("%s\n%s\n%s\n%s" % (url, title, body, html)).lower()
     return any(marker in text for marker in (
-        "err_proxy", "proxy connection failed", "proxy server",
-        "proxy authentication", "tunnel connection failed",
-        "无法连接到代理服务器", "代理服务器",
+        "err_proxy", "err_tunnel", "err_connection", "err_timed_out",
+        "err_name_not_resolved", "err_empty_response", "err_ssl",
+        "proxy connection failed", "proxy server", "proxy authentication",
+        "tunnel connection failed", "net::err_", "chrome-error://",
+        "无法连接到代理服务器", "代理服务器", "无法访问此网站",
+        "网页可能暂时无法连接", "该网页无法正常运作",
+        "took too long to respond", "connection timed out",
     ))
 
 

@@ -70,6 +70,7 @@ class BatchResult:
     processed_count: int = 0
     registered_unsaved_count: int = 0
     postprocess_warning_count: int = 0
+    cpa_success_count: int = 0
     cancelled: bool = False
     results: list = field(default_factory=list)
 
@@ -310,6 +311,8 @@ def run_batch(count, callbacks, observer, ops, enable_nsfw=True, cleanup_interva
                 grok_cli_warning = bool(
                     output.grok_cli.get("enabled") and not output.grok_cli.get("ok")
                 )
+                if output.cpa.get("ok"):
+                    result.cpa_success_count += 1
                 if pool_warning or cpa_warning or grok_cli_warning:
                     result.postprocess_warning_count += 1
             except ops.cancelled_exception:

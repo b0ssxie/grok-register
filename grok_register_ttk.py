@@ -684,6 +684,7 @@ class GrokRegisterGUI:
         self.fail_count = 0
         self.registered_unsaved_count = 0
         self.postprocess_warning_count = 0
+        self.cpa_success_count = 0
         self.results = []
         self.stop_requested = False
         self.ui_queue = queue.Queue()
@@ -887,7 +888,7 @@ class GrokRegisterGUI:
         tk_label(status_frame, text="状态: ").pack(side=tk.LEFT)
         self.status_label = tk.Label(status_frame, textvariable=self.status_var, bg=UI_BG, fg="green")
         self.status_label.pack(side=tk.LEFT)
-        self.stats_var = tk.StringVar(value="成功: 0 | 失败: 0 | 待恢复: 0 | 后处理警告: 0")
+        self.stats_var = tk.StringVar(value="成功: 0 | 失败: 0 | CPA: 0 | 待恢复: 0 | 后处理警告: 0")
         tk.Label(status_frame, textvariable=self.stats_var, bg=UI_BG, fg=UI_FG).pack(side=tk.RIGHT)
         log_frame = tk.LabelFrame(
             main_frame,
@@ -932,7 +933,7 @@ class GrokRegisterGUI:
                 elif kind == "clear_log":
                     self.log_text.delete(1.0, tk.END)
                 elif kind == "stats":
-                    self.stats_var.set(f"成功: {event[1]} | 失败: {event[2]} | 待恢复: {event[3]} | 后处理警告: {event[4]}")
+                    self.stats_var.set(f"成功: {event[1]} | 失败: {event[2]} | CPA: {event[5]} | 待恢复: {event[3]} | 后处理警告: {event[4]}")
                 elif kind == "running":
                     running = bool(event[1])
                     self.start_btn.config(state=tk.DISABLED if running else tk.NORMAL)
@@ -961,7 +962,7 @@ class GrokRegisterGUI:
         self.ui_queue.put(("clear_log",))
 
     def update_stats(self):
-        self.ui_queue.put(("stats", self.success_count, self.fail_count, self.registered_unsaved_count, self.postprocess_warning_count))
+        self.ui_queue.put(("stats", self.success_count, self.fail_count, self.registered_unsaved_count, self.postprocess_warning_count, self.cpa_success_count))
 
     def _set_running_ui(self, running):
         self.is_running = bool(running)
@@ -976,6 +977,7 @@ class GrokRegisterGUI:
         self.fail_count = 0
         self.registered_unsaved_count = 0
         self.postprocess_warning_count = 0
+        self.cpa_success_count = 0
 
     def start_registration(self):
         if self.is_running:
@@ -1044,6 +1046,7 @@ class GrokRegisterGUI:
         def observer(batch, account, output):
             self.success_count = batch.success_count
             self.fail_count = batch.fail_count
+            self.cpa_success_count = batch.cpa_success_count
             self.registered_unsaved_count = batch.registered_unsaved_count
             self.postprocess_warning_count = batch.postprocess_warning_count
             if account is not None:
@@ -1059,6 +1062,7 @@ class GrokRegisterGUI:
             )
             self.success_count = batch.success_count
             self.fail_count = batch.fail_count
+            self.cpa_success_count = batch.cpa_success_count
             self.registered_unsaved_count = batch.registered_unsaved_count
             self.postprocess_warning_count = batch.postprocess_warning_count
             self.update_stats()
@@ -1101,7 +1105,7 @@ def run_registration_cli(count):
         last_stats["fail"] = batch.fail_count
         last_stats["pending"] = batch.registered_unsaved_count
         last_stats["warnings"] = batch.postprocess_warning_count
-        cli_log(f"[*] 当前统计: 成功 {batch.success_count} | 失败 {batch.fail_count} | 待恢复 {batch.registered_unsaved_count} | 后处理警告 {batch.postprocess_warning_count}")
+        cli_log(f"[*] 当前统计: 成功 {batch.success_count} | 失败 {batch.fail_count} | CPA {batch.cpa_success_count} | 待恢复 {batch.registered_unsaved_count} | 后处理警告 {batch.postprocess_warning_count}")
     try:
         batch = run_registration_common(
             count=count,

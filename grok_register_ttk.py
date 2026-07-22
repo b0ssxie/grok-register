@@ -278,12 +278,12 @@ def _bind_registration_browser():
 
 
 LocalAuthProxyBridge = _browser_runtime.LocalAuthProxyBridge
-for _name in ['get_configured_proxy', 'get_proxies', '_parse_proxy_url', '_safe_proxy_port', '_proxy_has_auth', '_strip_proxy_auth', '_proxy_endpoint_terms', 'is_proxy_connection_error', 'page_has_proxy_error', '_ReusableThreadingTCPServer', '_proxy_recv_until_headers', '_proxy_relay', '_LocalAuthProxyBridgeHandler', 'LocalAuthProxyBridge', 'prepare_browser_proxy', 'apply_browser_proxy_option', 'create_browser_options', '_build_request_kwargs', 'http_get', 'http_post']:
+for _name in ['get_configured_proxy', 'cycle_proxy', 'proxy_pool_size', 'get_proxies', '_parse_proxy_url', '_safe_proxy_port', '_proxy_has_auth', '_strip_proxy_auth', '_proxy_endpoint_terms', 'is_proxy_connection_error', 'page_has_proxy_error', '_ReusableThreadingTCPServer', '_proxy_recv_until_headers', '_proxy_relay', '_LocalAuthProxyBridgeHandler', 'LocalAuthProxyBridge', 'prepare_browser_proxy', 'apply_browser_proxy_option', 'create_browser_options', '_build_request_kwargs', 'http_get', 'http_post']:
     if _name.startswith("_") and _name in {"_ReusableThreadingTCPServer", "_LocalAuthProxyBridgeHandler", "_proxy_recv_until_headers", "_proxy_relay"}:
         continue
     if _name != "LocalAuthProxyBridge":
         globals()[_name] = _make_compat_proxy(_browser_runtime, _name, _bind_browser_runtime)
-for _name in ['resolve_grok2api_local_token_file', '_normalize_sso_token', 'add_token_to_grok2api_local_pool', 'get_grok2api_remote_api_bases', 'add_token_to_grok2api_remote_pool', 'add_token_to_grok2api_pools']:
+for _name in ['resolve_grok2api_local_token_file', '_normalize_sso_token', 'add_token_to_grok2api_local_pool', 'get_grok2api_remote_api_bases', 'add_token_to_grok2api_remote_pool', 'add_token_to_grok2api_pools', 'add_token_to_grok_cli_9router']:
     globals()[_name] = _make_compat_proxy(_account_outputs, _name, _bind_account_outputs)
 _MAIL_ORIGINALS = dict((name, getattr(_mail_service, name)) for name in ['_pick_list_payload', 'cloudflare_apply_auth_params', 'cloudflare_build_headers', 'cloudflare_create_account', 'cloudflare_create_temp_address', 'cloudflare_get_domains', 'cloudflare_get_message_detail', 'cloudflare_get_messages', 'cloudflare_get_oai_code', 'cloudflare_get_token', 'cloudflare_is_admin_create_path', 'cloudflare_next_default_domain', 'cloudmail_get_email_and_token', 'cloudmail_get_messages', 'cloudmail_get_oai_code', 'cloudmail_next_domain', 'create_account', 'duckmail_get_oai_code', 'extract_verification_code', 'generate_username', 'get_cloudflare_api_base', 'get_cloudflare_api_key', 'get_cloudflare_auth_mode', 'get_cloudflare_path', 'get_cloudmail_api_base', 'get_cloudmail_path', 'get_cloudmail_public_token', 'get_domains', 'get_duckmail_api_key', 'get_email_and_token', 'get_email_provider', 'get_message_detail', 'get_messages', 'get_oai_code', 'get_token', 'get_user_agent', 'get_yyds_api_key', 'get_yyds_jwt', 'pick_domain', 'yyds_create_account', 'yyds_generate_username', 'yyds_get_domains', 'yyds_get_email_and_token', 'yyds_get_message_detail', 'yyds_get_messages', 'yyds_get_oai_code', 'yyds_get_token', 'yyds_pick_domain'])
 _MAIL_COMPAT_PROXIES = dict()
@@ -654,6 +654,7 @@ def run_registration_common(count, log_callback, cancel_callback, accounts_outpu
             email=email, password=password, sso=sso,
             log_callback=log_callback, cancel_callback=cancel_callback,
         ),
+        add_grok_cli=lambda cpa: add_token_to_grok_cli_9router(cpa, log_callback=log_callback),
         cleanup=lambda reason: cleanup_runtime_memory(log_callback=log_callback, reason=reason),
         sleep=lambda seconds: sleep_with_cancel(seconds, cancel_callback),
         cancelled_exception=RegistrationCancelled,
@@ -763,29 +764,34 @@ class GrokRegisterGUI:
         self.proxy_entry = tk_entry(config_frame, textvariable=self.proxy_var, width=34)
         add_field(self.proxy_entry, 1, 3)
 
-        add_label(2, 0, "DuckMail API Key:")
+        add_label(2, 0, "代理池（可选）:")
+        self.proxy_pool_var = tk.StringVar(value=config.get("proxy_pool", ""))
+        self.proxy_pool_entry = tk_entry(config_frame, textvariable=self.proxy_pool_var, width=72)
+        add_field(self.proxy_pool_entry, 2, 1, columnspan=3)
+
+        add_label(3, 0, "DuckMail API Key:")
         self.api_key_var = tk.StringVar(value=config.get("duckmail_api_key", ""))
         self.api_key_entry = tk_entry(config_frame, textvariable=self.api_key_var, width=34)
-        add_field(self.api_key_entry, 2, 1)
+        add_field(self.api_key_entry, 3, 1)
 
-        add_label(2, 2, "Cloudflare 鉴权模式:")
+        add_label(3, 2, "Cloudflare 鉴权模式:")
         self.cloudflare_auth_mode_var = tk.StringVar(value=config.get("cloudflare_auth_mode", "none"))
         self.cloudflare_auth_mode_combo = tk_option_menu(
             config_frame, self.cloudflare_auth_mode_var, ["query-key", "bearer", "x-api-key", "x-admin-auth", "none"], width=12
         )
-        add_field(self.cloudflare_auth_mode_combo, 2, 3, sticky=tk.W)
+        add_field(self.cloudflare_auth_mode_combo, 3, 3, sticky=tk.W)
 
-        add_label(3, 0, "Cloudflare API Base:")
+        add_label(4, 0, "Cloudflare API Base:")
         self.cloudflare_api_base_var = tk.StringVar(value=config.get("cloudflare_api_base", ""))
         self.cloudflare_api_base_entry = tk_entry(config_frame, textvariable=self.cloudflare_api_base_var, width=72)
-        add_field(self.cloudflare_api_base_entry, 3, 1, columnspan=3)
+        add_field(self.cloudflare_api_base_entry, 4, 1, columnspan=3)
 
-        add_label(4, 0, "Cloudflare API Key:")
+        add_label(5, 0, "Cloudflare API Key:")
         self.cloudflare_api_key_var = tk.StringVar(value=config.get("cloudflare_api_key", ""))
         self.cloudflare_api_key_entry = tk_entry(config_frame, textvariable=self.cloudflare_api_key_var, width=34)
-        add_field(self.cloudflare_api_key_entry, 4, 1)
+        add_field(self.cloudflare_api_key_entry, 5, 1)
 
-        add_label(4, 2, "CF 路径:")
+        add_label(5, 2, "CF 路径:")
         self.cloudflare_paths_var = tk.StringVar(
             value=",".join(
                 [
@@ -797,64 +803,74 @@ class GrokRegisterGUI:
             )
         )
         self.cloudflare_paths_entry = tk_entry(config_frame, textvariable=self.cloudflare_paths_var, width=34)
-        add_field(self.cloudflare_paths_entry, 4, 3)
+        add_field(self.cloudflare_paths_entry, 5, 3)
 
-        add_label(5, 0, "Cloud Mail API Base:")
+        add_label(6, 0, "Cloud Mail API Base:")
         self.cloudmail_api_base_var = tk.StringVar(value=config.get("cloudmail_api_base", ""))
         self.cloudmail_api_base_entry = tk_entry(config_frame, textvariable=self.cloudmail_api_base_var, width=34)
-        add_field(self.cloudmail_api_base_entry, 5, 1)
+        add_field(self.cloudmail_api_base_entry, 6, 1)
 
-        add_label(5, 2, "Cloud Mail 域名:")
+        add_label(6, 2, "Cloud Mail 域名:")
         self.cloudmail_domains_var = tk.StringVar(value=config.get("cloudmail_domains", ""))
         self.cloudmail_domains_entry = tk_entry(config_frame, textvariable=self.cloudmail_domains_var, width=34)
-        add_field(self.cloudmail_domains_entry, 5, 3)
+        add_field(self.cloudmail_domains_entry, 6, 3)
 
-        add_label(6, 0, "Cloud Mail Public Token:")
+        add_label(7, 0, "Cloud Mail Public Token:")
         self.cloudmail_public_token_var = tk.StringVar(value=config.get("cloudmail_public_token", ""))
         self.cloudmail_public_token_entry = tk_entry(config_frame, textvariable=self.cloudmail_public_token_var, width=72)
-        add_field(self.cloudmail_public_token_entry, 6, 1, columnspan=3)
+        add_field(self.cloudmail_public_token_entry, 7, 1, columnspan=3)
 
-        add_label(7, 0, "grok2api 本地入池:")
+        add_label(8, 0, "grok2api 本地入池:")
         self.grok2api_local_auto_var = tk.BooleanVar(value=bool(config.get("grok2api_auto_add_local", True)))
         self.grok2api_local_auto_check = tk_checkbutton(config_frame, variable=self.grok2api_local_auto_var)
-        add_field(self.grok2api_local_auto_check, 7, 1, sticky=tk.W)
+        add_field(self.grok2api_local_auto_check, 8, 1, sticky=tk.W)
 
-        add_label(7, 2, "grok2api 池名:")
+        add_label(8, 2, "grok2api 池名:")
         self.grok2api_pool_name_var = tk.StringVar(value=str(config.get("grok2api_pool_name", "ssoBasic")))
         self.grok2api_pool_name_combo = tk_option_menu(
             config_frame, self.grok2api_pool_name_var, ["ssoBasic", "ssoSuper"], width=12
         )
-        add_field(self.grok2api_pool_name_combo, 7, 3, sticky=tk.W)
+        add_field(self.grok2api_pool_name_combo, 8, 3, sticky=tk.W)
 
-        add_label(8, 0, "本地 token.json:")
+        add_label(9, 0, "本地 token.json:")
         self.grok2api_local_file_var = tk.StringVar(value=str(config.get("grok2api_local_token_file", "")))
         self.grok2api_local_file_entry = tk_entry(config_frame, textvariable=self.grok2api_local_file_var, width=72)
-        add_field(self.grok2api_local_file_entry, 8, 1, columnspan=3)
+        add_field(self.grok2api_local_file_entry, 9, 1, columnspan=3)
 
-        add_label(9, 0, "grok2api 远端入池:")
+        add_label(10, 0, "grok2api 远端入池:")
         self.grok2api_remote_auto_var = tk.BooleanVar(value=bool(config.get("grok2api_auto_add_remote", False)))
         self.grok2api_remote_auto_check = tk_checkbutton(config_frame, variable=self.grok2api_remote_auto_var)
-        add_field(self.grok2api_remote_auto_check, 9, 1, sticky=tk.W)
+        add_field(self.grok2api_remote_auto_check, 10, 1, sticky=tk.W)
 
-        add_label(10, 0, "grok2api 远端 Base:")
+        add_label(11, 0, "grok2api 远端 Base:")
         self.grok2api_remote_base_var = tk.StringVar(value=str(config.get("grok2api_remote_base", "")))
         self.grok2api_remote_base_entry = tk_entry(config_frame, textvariable=self.grok2api_remote_base_var, width=72)
-        add_field(self.grok2api_remote_base_entry, 10, 1, columnspan=3)
+        add_field(self.grok2api_remote_base_entry, 11, 1, columnspan=3)
 
-        add_label(11, 0, "grok2api 远端 app_key:")
+        add_label(12, 0, "grok2api 远端 app_key:")
         self.grok2api_remote_key_var = tk.StringVar(value=str(config.get("grok2api_remote_app_key", "")))
         self.grok2api_remote_key_entry = tk_entry(config_frame, textvariable=self.grok2api_remote_key_var, width=72)
-        add_field(self.grok2api_remote_key_entry, 11, 1, columnspan=3)
+        add_field(self.grok2api_remote_key_entry, 12, 1, columnspan=3)
 
-        add_label(12, 0, "OIDC / CPA:")
+        add_label(13, 0, "OIDC / CPA:")
         self.cpa_export_var = tk.BooleanVar(value=bool(config.get("cpa_export_enabled", False)))
         self.cpa_export_check = tk_checkbutton(config_frame, text="注册成功后导出 CPA xAI OIDC", variable=self.cpa_export_var)
-        add_field(self.cpa_export_check, 12, 1, sticky=tk.W)
+        add_field(self.cpa_export_check, 13, 1, sticky=tk.W)
 
-        add_label(12, 2, "CPA 输出目录:")
+        add_label(13, 2, "CPA 输出目录:")
         self.cpa_auth_dir_var = tk.StringVar(value=str(config.get("cpa_auth_dir", "./cpa_auths")))
         self.cpa_auth_dir_entry = tk_entry(config_frame, textvariable=self.cpa_auth_dir_var, width=34)
-        add_field(self.cpa_auth_dir_entry, 12, 3)
+        add_field(self.cpa_auth_dir_entry, 13, 3)
+
+        add_label(14, 0, "9Router Grok CLI:")
+        self.grok2api_grok_cli_var = tk.BooleanVar(value=bool(config.get("grok2api_auto_add_grok_cli", False)))
+        self.grok2api_grok_cli_check = tk_checkbutton(config_frame, text="注册后自动添加到 9Router Grok CLI", variable=self.grok2api_grok_cli_var)
+        add_field(self.grok2api_grok_cli_check, 14, 1, sticky=tk.W)
+
+        add_label(14, 2, "9Router DB 路径:")
+        self.grok2api_9router_db_var = tk.StringVar(value=str(config.get("grok2api_9router_db_path", "")))
+        self.grok2api_9router_db_entry = tk_entry(config_frame, textvariable=self.grok2api_9router_db_var, width=34)
+        add_field(self.grok2api_9router_db_entry, 14, 3)
 
         btn_frame = tk.Frame(main_frame, bg=UI_BG)
         btn_frame.grid(row=1, column=0, sticky=tk.EW, pady=(0, 6))
@@ -969,6 +985,7 @@ class GrokRegisterGUI:
         config["email_provider"] = self.email_provider_var.get().strip() or "duckmail"
         config["enable_nsfw"] = bool(self.nsfw_var.get())
         config["proxy"] = self.proxy_var.get().strip()
+        config["proxy_pool"] = self.proxy_pool_var.get().strip()
         config["duckmail_api_key"] = self.api_key_var.get().strip()
         config["cloudflare_api_base"] = self.cloudflare_api_base_var.get().strip()
         config["cloudflare_api_key"] = self.cloudflare_api_key_var.get().strip()
@@ -984,6 +1001,8 @@ class GrokRegisterGUI:
         config["grok2api_remote_app_key"] = self.grok2api_remote_key_var.get().strip()
         config["cpa_export_enabled"] = bool(self.cpa_export_var.get())
         config["cpa_auth_dir"] = self.cpa_auth_dir_var.get().strip() or "./cpa_auths"
+        config["grok2api_auto_add_grok_cli"] = bool(self.grok2api_grok_cli_var.get())
+        config["grok2api_9router_db_path"] = self.grok2api_9router_db_var.get().strip()
         raw_paths = [x.strip() for x in self.cloudflare_paths_var.get().split(",") if x.strip()]
         if len(raw_paths) >= 4:
             config["cloudflare_path_domains"] = raw_paths[0] if raw_paths[0].startswith("/") else ("/" + raw_paths[0])

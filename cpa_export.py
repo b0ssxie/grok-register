@@ -43,7 +43,7 @@ class CpaExportSettings:
             auth_dir=auth_dir,
             hotload_dir=hotload_dir,
             copy_to_hotload=bool(cfg.get("cpa_copy_to_hotload", False)),
-            proxy=str(cfg.get("cpa_proxy") or cfg.get("proxy") or "").strip(),
+            proxy=str(cfg.get("cpa_proxy") or "").strip(),
             headless=bool(cfg.get("cpa_headless", False)),
             mint_timeout=float(cfg.get("cpa_mint_timeout_sec") or 300),
             request_timeout=float(cfg.get("cpa_oidc_request_timeout_sec") or 15),

@@ -43,6 +43,7 @@ def make_ops(enable_nsfw=None, export_cpa=None):
             "remote": {"enabled": False, "ok": None, "error": None},
         },
         export_cpa=export_cpa or (lambda email, password, sso: {"ok": False, "skipped": True}),
+        add_grok_cli=lambda cpa: {"enabled": False, "ok": None, "error": "skipped"},
         cleanup=lambda reason: None,
         sleep=lambda seconds: None,
         cancelled_exception=Cancelled,

@@ -20,6 +20,7 @@ DEFAULT_CONFIG = {
     "cloudmail_domains": "",
     "cloudmail_path_messages": "/api/public/emailList",
     "proxy": "",
+    "proxy_pool": "",
     "enable_nsfw": True,
     "register_count": 1,
     "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
@@ -43,6 +44,8 @@ DEFAULT_CONFIG = {
     "cpa_oidc_request_timeout_sec": 15,
     "cpa_oidc_poll_timeout_sec": 15,
     "grok2api_allow_legacy_full_save": False,
+    "grok2api_auto_add_grok_cli": False,
+    "grok2api_9router_db_path": "",
     "email_provider": "duckmail",
     "yyds_api_key": "",
     "yyds_jwt": "",
@@ -90,7 +93,8 @@ def validate_config_structure(raw):
     cfg = {**DEFAULT_CONFIG, **raw}
     bool_keys = (
         "enable_nsfw", "grok2api_auto_add_local", "grok2api_auto_add_remote",
-        "grok2api_allow_legacy_full_save", "cpa_export_enabled",
+        "grok2api_allow_legacy_full_save", "grok2api_auto_add_grok_cli",
+        "cpa_export_enabled",
         "cpa_copy_to_hotload", "cpa_headless", "cpa_force_standalone",
         "cpa_mint_cookie_inject",
     )
@@ -168,6 +172,8 @@ def validate_run_requirements(cfg):
             raise ConfigError("远端 token 入池缺少必需配置: " + ", ".join(missing))
     if cfg["cpa_export_enabled"] and cfg["cpa_copy_to_hotload"] and not cfg["cpa_hotload_dir"]:
         raise ConfigError("启用 CPA 热加载复制时必须配置 cpa_hotload_dir")
+    if cfg["grok2api_auto_add_grok_cli"] and not cfg["cpa_export_enabled"]:
+        raise ConfigError("启用 9Router Grok CLI 入池必须同时启用 CPA 导出 (cpa_export_enabled)")
     return cfg
 
 

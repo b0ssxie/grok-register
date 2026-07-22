@@ -12,6 +12,7 @@
   "cloudmail_domains": "example.com",
   "cloudmail_path_messages": "/api/public/emailList",
   "proxy": "",
+  "proxy_pool": "",
   "enable_nsfw": true,
   "register_count": 1,
   "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
@@ -38,5 +39,7 @@
   "yyds_jwt": "",
   "cpa_oidc_request_timeout_sec": 15,
   "cpa_oidc_poll_timeout_sec": 15,
-  "grok2api_allow_legacy_full_save": false
+  "grok2api_allow_legacy_full_save": false,
+  "grok2api_auto_add_grok_cli": false,
+  "grok2api_9router_db_path": ""
 }

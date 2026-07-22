@@ -199,6 +199,8 @@ def stop_browser_proxy_bridge():
 def start_browser(log_callback=None, use_proxy=True):
     global browser, page, browser_proxy_bridge, browser_started_with_proxy
     last_exc = None
+    if use_proxy:
+        cycle_proxy()
     proxy_enabled = bool(use_proxy and get_configured_proxy())
     for attempt in range(1, 5):
         bridge = None

@@ -43,6 +43,7 @@ class FakeOps:
                 "remote": {"enabled": False, "ok": None, "error": None},
             },
             export_cpa=lambda email, password, sso: {"ok": False, "skipped": True},
+            add_grok_cli=lambda cpa: {"enabled": False, "ok": None, "error": "skipped"},
             cleanup=lambda reason: self.events.append(("cleanup", reason)),
             sleep=lambda seconds: self.events.append(("sleep", seconds)),
             cancelled_exception=Cancelled,

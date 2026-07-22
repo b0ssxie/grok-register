@@ -25,6 +25,7 @@ class RegistrationOperations:
     queue_unsaved_result: Callable[[Dict[str, Any], str], bool]
     add_tokens: Callable[[str, str], Dict[str, Dict[str, Any]]]
     export_cpa: Callable[[str, str, str], Dict[str, Any]]
+    add_grok_cli: Callable[[Dict[str, Any]], Dict[str, Any]]
     cleanup: Callable[[str], None]
     sleep: Callable[[float], None]
     cancelled_exception: type
@@ -50,6 +51,7 @@ class OutputResult:
     save_error: str = ""
     pools: Dict[str, Dict[str, Any]] = field(default_factory=dict)
     cpa: Dict[str, Any] = field(default_factory=dict)
+    grok_cli: Dict[str, Any] = field(default_factory=dict)
 
 
 @dataclass
@@ -183,6 +185,15 @@ def persist_account_result(result, callbacks, ops):
         callbacks.log(f"[!] CPA 导出后处理异常，账号结果已保留: {exc}")
         cpa = {"ok": False, "skipped": False, "error": str(exc)}
 
+    try:
+        if cpa.get("ok"):
+            grok_cli = ops.add_grok_cli(cpa)
+        else:
+            grok_cli = {"enabled": False, "ok": None, "error": "CPA 未成功，跳过"}
+    except Exception as exc:
+        callbacks.log(f"[!] 9Router Grok CLI 入池后处理异常: {exc}")
+        grok_cli = {"enabled": True, "ok": False, "error": str(exc)}
+
     return OutputResult(
         registered=True,
         saved=saved,
@@ -190,6 +201,7 @@ def persist_account_result(result, callbacks, ops):
         save_error=save_error,
         pools=pools,
         cpa=cpa,
+        grok_cli=grok_cli,
     )
 
 
@@ -295,7 +307,10 @@ def run_batch(count, callbacks, observer, ops, enable_nsfw=True, cleanup_interva
                         or output.cpa.get("cpa_copy_error")
                     )
                 )
-                if pool_warning or cpa_warning:
+                grok_cli_warning = bool(
+                    output.grok_cli.get("enabled") and not output.grok_cli.get("ok")
+                )
+                if pool_warning or cpa_warning or grok_cli_warning:
                     result.postprocess_warning_count += 1
             except ops.cancelled_exception:
                 result.cancelled = True

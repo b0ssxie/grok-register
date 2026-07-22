@@ -3,6 +3,7 @@ import json
 import os
 import tempfile
 import time
+import uuid
 from contextlib import ExitStack
 from datetime import datetime, timezone
 
@@ -398,4 +399,84 @@ def add_token_to_grok2api_pools(raw_token, email="", log_callback=None):
             result["remote"]["ok"] = False
             result["remote"]["error"] = log_exception("写入 grok2api 远端池失败", exc, log_callback)
     return result
+
+
+def _default_9router_db_path():
+    appdata = os.environ.get("APPDATA", "")
+    if appdata:
+        candidate = os.path.join(appdata, "9router", "db", "data.sqlite")
+        if os.path.isfile(candidate):
+            return candidate
+    return ""
+
+
+def add_token_to_grok_cli_9router(cpa_result, log_callback=None):
+    logger = log_callback or (lambda message: None)
+    if not isinstance(cpa_result, dict) or not cpa_result.get("ok"):
+        return {"enabled": True, "ok": False, "error": "CPA 未成功或未启用"}
+    cpa_path = cpa_result.get("path")
+    if not cpa_path:
+        return {"enabled": True, "ok": False, "error": "CPA 结果缺少 path"}
+    try:
+        with open(cpa_path, "r", encoding="utf-8") as f:
+            cpa_data = json.load(f)
+    except Exception as exc:
+        return {"enabled": True, "ok": False, "error": f"读取 CPA 文件失败: {exc}"}
+    access_token = str(cpa_data.get("access_token") or "").strip()
+    refresh_token = str(cpa_data.get("refresh_token") or "").strip()
+    if not access_token or not refresh_token:
+        return {"enabled": True, "ok": False, "error": "CPA 文件中缺少 access_token 或 refresh_token"}
+    id_token = str(cpa_data.get("id_token") or "").strip()
+    email = str(cpa_data.get("email") or "").strip()
+    sub = str(cpa_data.get("sub") or "").strip()
+    expires_in = int(cpa_data.get("expires_in") or 21600)
+    db_path = str(config.get("grok2api_9router_db_path") or "").strip()
+    if not db_path:
+        db_path = _default_9router_db_path()
+    if not db_path or not os.path.isfile(db_path):
+        return {"enabled": True, "ok": False, "error": f"9Router 数据库未找到: {db_path}"}
+    connection_id = str(uuid.uuid4())
+    now = time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime())
+    expires_at = time.strftime("%Y-%m-%dT%H:%M:%S.000Z", time.gmtime(time.time() + expires_in))
+    data = {
+        "accessToken": access_token,
+        "refreshToken": refresh_token,
+        "expiresAt": expires_at,
+        "scope": "openid profile email offline_access grok-cli:access api:access conversations:read conversations:write",
+        "testStatus": "active",
+        "expiresIn": expires_in,
+        "providerSpecificData": {
+            "authMethod": "device_code",
+            "idToken": id_token,
+            "email": email,
+            "userId": sub,
+            "hasGrokCodeAccess": True,
+            "subscriptionTier": None,
+        },
+    }
+    if id_token:
+        data["providerSpecificData"]["idToken"] = id_token
+    for attempt in range(3):
+        try:
+            import sqlite3
+            db = sqlite3.connect(db_path, timeout=5)
+            db.execute("PRAGMA journal_mode=WAL")
+            db.execute(
+                "INSERT OR REPLACE INTO providerConnections "
+                "(id, provider, authType, name, email, priority, isActive, data, createdAt, updatedAt) "
+                "VALUES (?, 'grok-cli', 'oauth', ?, ?, 1, 1, ?, ?, ?)",
+                (connection_id, email, email, json.dumps(data), now, now),
+            )
+            db.commit()
+            db.close()
+            logger(f"[+] 已写入 9Router Grok CLI: {email}")
+            return {"enabled": True, "ok": True}
+        except sqlite3.OperationalError as exc:
+            if "database is locked" in str(exc) and attempt < 2:
+                time.sleep(0.5)
+                continue
+            return {"enabled": True, "ok": False, "error": f"9Router DB 写入失败: {exc}"}
+        except Exception as exc:
+            return {"enabled": True, "ok": False, "error": f"9Router DB 写入失败: {exc}"}
+    return {"enabled": True, "ok": False, "error": "9Router DB 写入失败: 超过重试次数"}
 

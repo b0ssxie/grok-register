@@ -12,16 +12,35 @@ from cpa_xai.proxyutil import (
 
 _config = {}
 _extension_path = ""
+_proxy_pool = []
+_proxy_pool_index = 0
 
 
 def configure_runtime(config_ref, extension_path=""):
-    global _config, _extension_path
+    global _config, _extension_path, _proxy_pool, _proxy_pool_index
     _config = config_ref
     _extension_path = str(extension_path or "")
+    raw = str(_config.get("proxy_pool") or "").strip()
+    _proxy_pool = [p.strip() for p in raw.split(",") if p.strip()] if raw else []
+    _proxy_pool_index = 0
 
 
 def get_configured_proxy():
     return str(_config.get("proxy", "") or "").strip()
+
+
+def cycle_proxy():
+    global _proxy_pool_index
+    if _proxy_pool:
+        proxy = _proxy_pool[_proxy_pool_index % len(_proxy_pool)]
+        _proxy_pool_index = (_proxy_pool_index + 1) % len(_proxy_pool)
+        _config["proxy"] = proxy
+        return proxy
+    return get_configured_proxy()
+
+
+def proxy_pool_size():
+    return len(_proxy_pool)
 
 
 def get_proxies():

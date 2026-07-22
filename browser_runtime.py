@@ -43,6 +43,19 @@ def proxy_pool_size():
     return len(_proxy_pool)
 
 
+def proxy_log_label(proxy=None):
+    raw = str(proxy if proxy is not None else get_configured_proxy() or "").strip()
+    if not raw:
+        return "(none)"
+    try:
+        parsed = urllib.parse.urlsplit(raw if "://" in raw else "http://" + raw)
+        host = parsed.hostname or "?"
+        port = parsed.port or ""
+        return f"{host}:{port}" if port else host
+    except Exception:
+        return "(proxy)"
+
+
 def get_proxies():
     proxy = get_configured_proxy()
     return {"http": proxy, "https": proxy} if proxy else {}
@@ -132,6 +145,12 @@ def page_has_proxy_error(page_obj):
         "无法连接到代理服务器", "代理服务器", "无法访问此网站",
         "网页可能暂时无法连接", "该网页无法正常运作",
         "took too long to respond", "connection timed out",
+        # Chromium 内置错误页特征（title 可能仍是目标域名）
+        "copyright 2017 the chromium authors",
+        "dnserror-no-server-hostname",
+        "main-frame-error",
+        "error-code",
+        "sub-frame-error",
     ))
 
 

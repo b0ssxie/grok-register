@@ -384,7 +384,7 @@ def open_signup_page(log_callback=None, cancel_callback=None):
     if browser is None:
         start_browser(log_callback=log_callback)
         if log_callback:
-            log_callback("[*] 浏览器已启动")
+            log_callback(f"[*] 浏览器已启动 | 代理: {proxy_log_label()}")
 
     def _open_with_current_browser():
         global page
@@ -397,50 +397,51 @@ def open_signup_page(log_callback=None, cancel_callback=None):
             page = browser.new_tab(SIGNUP_URL)
         page.wait.doc_loaded()
 
-    def _recover_proxy_and_retry(reason):
-        if not (browser_started_with_proxy and get_configured_proxy()):
-            return False
-        if log_callback:
-            log_callback(f"[!] {reason}，切换代理/重试")
-        # 有代理池时换下一个；否则回退直连
-        if proxy_pool_size() > 1:
-            restart_browser(log_callback=log_callback, use_proxy=True)
-        else:
-            if log_callback:
-                log_callback("[!] 浏览器代理访问注册页失败，自动回退直连")
-            restart_browser(log_callback=log_callback, use_proxy=False)
-        _open_with_current_browser()
-        return True
+    def _page_is_broken():
+        return page_has_proxy_error(page)
 
-    try:
+    def _try_open_once():
         _open_with_current_browser()
-    except Exception as e:
-        if not _recover_proxy_and_retry(f"浏览器代理访问注册页失败: {e}"):
-            raise
-
-    if browser_started_with_proxy and page_has_proxy_error(page):
-        if not _recover_proxy_and_retry("浏览器页面显示代理/网络错误"):
+        sleep_with_cancel(1.5, cancel_callback)
+        if _page_is_broken():
             raise Exception("注册页代理/网络错误（无法加载真实页面）")
+        if log_callback:
+            log_callback(f"[*] 当前URL: {page.url} | 代理: {proxy_log_label()}")
+        click_email_signup_button(log_callback=log_callback, cancel_callback=cancel_callback)
 
-    sleep_with_cancel(2, cancel_callback)
-    if log_callback:
-        log_callback(f"[*] 当前URL: {page.url}")
-    # 等待期若仍是错误页，再换一次代理
-    try:
-        click_email_signup_button(
-            log_callback=log_callback, cancel_callback=cancel_callback
-        )
-    except Exception as e:
-        msg = str(e)
-        if "代理/网络错误" in msg or "未找到「使用邮箱注册」按钮" in msg:
-            if browser_started_with_proxy and page_has_proxy_error(page):
-                if _recover_proxy_and_retry(f"查找邮箱注册按钮失败且页面为错误页: {e}"):
-                    sleep_with_cancel(2, cancel_callback)
-                    click_email_signup_button(
-                        log_callback=log_callback, cancel_callback=cancel_callback
-                    )
-                    return
-        raise
+    # 有代理池时最多换 3 个节点；没有池则 1 次代理 + 1 次直连
+    pool_n = proxy_pool_size()
+    max_proxy_tries = min(3, pool_n) if pool_n > 1 else (1 if get_configured_proxy() else 0)
+    last_exc = None
+    for attempt in range(1, max_proxy_tries + 1):
+        raise_if_cancelled(cancel_callback)
+        try:
+            _try_open_once()
+            return
+        except Exception as e:
+            last_exc = e
+            if not browser_started_with_proxy:
+                break
+            if log_callback:
+                log_callback(f"[!] 打开注册页失败({attempt}/{max_proxy_tries}) 代理={proxy_log_label()}: {e}")
+            if attempt < max_proxy_tries:
+                restart_browser(log_callback=log_callback, use_proxy=True)
+                if log_callback:
+                    log_callback(f"[*] 已切换代理: {proxy_log_label()}")
+            else:
+                break
+
+    # 最后回退直连
+    if get_configured_proxy() or browser_started_with_proxy:
+        if log_callback:
+            log_callback(f"[!] 代理全部失败，回退直连重试: {last_exc}")
+        restart_browser(log_callback=log_callback, use_proxy=False)
+        _try_open_once()
+        return
+
+    if last_exc:
+        raise last_exc
+    raise Exception("打开注册页失败")
 
 def has_profile_form(log_callback=None):
     refresh_active_page()

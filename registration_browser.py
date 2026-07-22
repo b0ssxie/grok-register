@@ -847,7 +847,7 @@ def getTurnstileToken(log_callback=None, cancel_callback=None):
     except Exception:
         pass
 
-    for _ in range(0, 20):
+    for _ in range(0, 12):
         raise_if_cancelled(cancel_callback)
         try:
             token = page.run_js(
@@ -1038,7 +1038,7 @@ return 'filled-no-submit';
                 if wait_cf_since is None:
                     wait_cf_since = now
                 # 卡住后自动二次复用 Turnstile 组件
-                if now - wait_cf_since >= 12 and now - last_cf_retry_at >= 8:
+                if now - wait_cf_since >= 6 and now - last_cf_retry_at >= 5:
                     if log_callback:
                         log_callback("[*] Cloudflare 验证卡住，开始二次复用 Turnstile...")
                     try:
@@ -1129,7 +1129,7 @@ return 'submitted';
             now = time.time()
             if wait_cf_since is None:
                 wait_cf_since = now
-            if now - wait_cf_since >= 12 and now - last_cf_retry_at >= 8:
+            if now - wait_cf_since >= 6 and now - last_cf_retry_at >= 5:
                 if log_callback:
                     log_callback("[*] 提交前仍卡住，自动再次复用 Turnstile...")
                 try:

@@ -21,7 +21,10 @@ def configure_runtime(config_ref, extension_path=""):
     _config = config_ref
     _extension_path = str(extension_path or "")
     raw = str(_config.get("proxy_pool") or "").strip()
-    _proxy_pool = [p.strip() for p in raw.split(",") if p.strip()] if raw else []
+    if bool(_config.get("proxy_pool_enabled", False)) and raw:
+        _proxy_pool = [p.strip() for p in raw.split(",") if p.strip()]
+    else:
+        _proxy_pool = []
     _proxy_pool_index = 0
 
 

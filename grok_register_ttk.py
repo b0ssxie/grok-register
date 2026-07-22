@@ -519,14 +519,15 @@ def tk_button(parent, text="", command=None, state="normal", **kwargs):
 
 
 def tk_checkbutton(parent, text="", variable=None, **kwargs):
+    bg = kwargs.pop("bg", UI_BG)
     return tk.Checkbutton(
         parent,
         text=text,
         variable=variable,
-        bg=UI_BG,
-        fg=UI_FG,
-        activebackground=UI_BG,
-        activeforeground=UI_FG,
+        bg=bg,
+        fg=kwargs.pop("fg", UI_FG),
+        activebackground=kwargs.pop("activebackground", bg),
+        activeforeground=kwargs.pop("activeforeground", UI_FG),
         selectcolor="#3d7be0",
         **kwargs,
     )
@@ -714,46 +715,44 @@ class GrokRegisterGUI:
         main_frame.grid_columnconfigure(0, weight=1)
         main_frame.grid_rowconfigure(3, weight=1)
 
-        config_frame = tk.LabelFrame(
-            main_frame,
-            text="配置",
-            bg=UI_PANEL_BG,
-            fg=UI_FG,
-            padx=10,
-            pady=10,
-            relief=tk.GROOVE,
-            borderwidth=1,
-        )
-        config_frame.grid(row=0, column=0, sticky=tk.EW, pady=(0, 8))
-        config_frame.grid_columnconfigure(1, weight=1, minsize=260)
-        config_frame.grid_columnconfigure(3, weight=1, minsize=260)
+        notebook = ttk.Notebook(main_frame)
+        notebook.grid(row=0, column=0, sticky=tk.EW, pady=(0, 8))
 
-        def add_label(row, column, text):
-            tk_label(config_frame, text=text, bg=UI_PANEL_BG).grid(
-                row=row,
-                column=column,
-                sticky=tk.W,
-                padx=(0, 6),
-                pady=3,
+        def make_tab(title):
+            frame = ttk.Frame(notebook, style="Tab.TFrame", padding=10)
+            notebook.add(frame, text=title)
+            inner = tk.Frame(frame, bg=UI_PANEL_BG)
+            inner.pack(fill=tk.BOTH, expand=True)
+            inner.grid_columnconfigure(1, weight=1, minsize=220)
+            inner.grid_columnconfigure(3, weight=1, minsize=220)
+            return inner
+
+        tab_basic = make_tab("基础")
+        tab_mail = make_tab("邮箱")
+        tab_pool = make_tab("入池")
+        tab_cpa = make_tab("CPA")
+
+        def add_label(parent, row, column, text):
+            tk_label(parent, text=text, bg=UI_PANEL_BG).grid(
+                row=row, column=column, sticky=tk.W, padx=(0, 6), pady=4,
             )
 
-        def add_field(widget, row, column, columnspan=1, sticky=tk.EW):
+        def add_field(parent, widget, row, column, columnspan=1, sticky=tk.EW):
             widget.grid(
-                row=row,
-                column=column,
-                columnspan=columnspan,
-                sticky=sticky,
-                padx=(0, 14),
-                pady=3,
+                row=row, column=column, columnspan=columnspan,
+                sticky=sticky, padx=(0, 12), pady=4,
             )
 
-        add_label(0, 0, "邮箱服务商:")
+        # --- 基础 ---
+        add_label(tab_basic, 0, 0, "邮箱服务商:")
         self.email_provider_var = tk.StringVar(value=config.get("email_provider", "duckmail"))
-        self.email_provider_combo = tk_option_menu(config_frame, self.email_provider_var, ["duckmail", "yyds", "cloudflare", "cloudmail"], width=12)
-        add_field(self.email_provider_combo, 0, 1, sticky=tk.W)
+        self.email_provider_combo = tk_option_menu(
+            tab_basic, self.email_provider_var, ["duckmail", "yyds", "cloudflare", "cloudmail"], width=12
+        )
+        add_field(tab_basic, self.email_provider_combo, 0, 1, sticky=tk.W)
 
-        add_label(0, 2, "数量/并发:")
-        count_frame = tk.Frame(config_frame, bg=UI_PANEL_BG)
+        add_label(tab_basic, 0, 2, "数量/并发:")
+        count_frame = tk.Frame(tab_basic, bg=UI_PANEL_BG)
         self.count_var = tk.StringVar(value=str(config.get("register_count", 1)))
         self.count_spinbox = tk.Spinbox(
             count_frame,
@@ -787,54 +786,53 @@ class GrokRegisterGUI:
             relief=tk.SOLID,
         )
         self.workers_spinbox.pack(side=tk.LEFT)
-        add_field(count_frame, 0, 3, sticky=tk.W)
+        add_field(tab_basic, count_frame, 0, 3, sticky=tk.W)
 
-        add_label(1, 0, "注册选项:")
-        opt_frame = tk.Frame(config_frame, bg=UI_PANEL_BG)
+        add_label(tab_basic, 1, 0, "注册选项:")
+        opt_frame = tk.Frame(tab_basic, bg=UI_PANEL_BG)
         self.nsfw_var = tk.BooleanVar(value=config.get("enable_nsfw", True))
-        self.nsfw_check = tk_checkbutton(opt_frame, text="注册后开启 NSFW", variable=self.nsfw_var)
+        self.nsfw_check = tk_checkbutton(
+            opt_frame, text="注册后开启 NSFW", variable=self.nsfw_var, bg=UI_PANEL_BG, activebackground=UI_PANEL_BG
+        )
         self.nsfw_check.pack(side=tk.LEFT)
         self.browser_headless_var = tk.BooleanVar(value=bool(config.get("browser_headless", False)))
-        self.browser_headless_check = tk_checkbutton(opt_frame, text="无头模式", variable=self.browser_headless_var)
+        self.browser_headless_check = tk_checkbutton(
+            opt_frame, text="无头模式", variable=self.browser_headless_var, bg=UI_PANEL_BG, activebackground=UI_PANEL_BG
+        )
         self.browser_headless_check.pack(side=tk.LEFT, padx=(12, 0))
-        add_field(opt_frame, 1, 1, sticky=tk.W)
+        add_field(tab_basic, opt_frame, 1, 1, sticky=tk.W)
 
-        add_label(1, 2, "代理（可选）:")
+        add_label(tab_basic, 1, 2, "代理（可选）:")
         self.proxy_var = tk.StringVar(value=config.get("proxy", ""))
-        self.proxy_entry = tk_entry(config_frame, textvariable=self.proxy_var, width=34)
-        add_field(self.proxy_entry, 1, 3)
+        self.proxy_entry = tk_entry(tab_basic, textvariable=self.proxy_var, width=34)
+        add_field(tab_basic, self.proxy_entry, 1, 3)
 
-        add_label(2, 0, "代理池:")
+        add_label(tab_basic, 2, 0, "代理池:")
         self.proxy_pool_enabled_var = tk.BooleanVar(value=bool(config.get("proxy_pool_enabled", False)))
-        self.proxy_pool_enabled_check = tk_checkbutton(config_frame, text="启用", variable=self.proxy_pool_enabled_var)
-        add_field(self.proxy_pool_enabled_check, 2, 1, sticky=tk.W)
+        self.proxy_pool_enabled_check = tk_checkbutton(
+            tab_basic, text="启用", variable=self.proxy_pool_enabled_var, bg=UI_PANEL_BG, activebackground=UI_PANEL_BG
+        )
+        add_field(tab_basic, self.proxy_pool_enabled_check, 2, 1, sticky=tk.W)
+
+        add_label(tab_basic, 3, 0, "代理池列表:")
         self.proxy_pool_var = tk.StringVar(value=config.get("proxy_pool", ""))
-        self.proxy_pool_entry = tk_entry(config_frame, textvariable=self.proxy_pool_var, width=48)
-        add_field(self.proxy_pool_entry, 2, 2, columnspan=2)
+        self.proxy_pool_entry = tk_entry(tab_basic, textvariable=self.proxy_pool_var, width=48)
+        add_field(tab_basic, self.proxy_pool_entry, 3, 1, columnspan=3)
 
-        add_label(3, 0, "DuckMail API Key:")
+        # --- 邮箱 ---
+        add_label(tab_mail, 0, 0, "DuckMail API Key:")
         self.api_key_var = tk.StringVar(value=config.get("duckmail_api_key", ""))
-        self.api_key_entry = tk_entry(config_frame, textvariable=self.api_key_var, width=34)
-        add_field(self.api_key_entry, 3, 1)
+        self.api_key_entry = tk_entry(tab_mail, textvariable=self.api_key_var, width=72)
+        add_field(tab_mail, self.api_key_entry, 0, 1, columnspan=3)
 
-        add_label(3, 2, "Cloudflare 鉴权模式:")
+        add_label(tab_mail, 1, 0, "Cloudflare 鉴权模式:")
         self.cloudflare_auth_mode_var = tk.StringVar(value=config.get("cloudflare_auth_mode", "none"))
         self.cloudflare_auth_mode_combo = tk_option_menu(
-            config_frame, self.cloudflare_auth_mode_var, ["query-key", "bearer", "x-api-key", "x-admin-auth", "none"], width=12
+            tab_mail, self.cloudflare_auth_mode_var, ["query-key", "bearer", "x-api-key", "x-admin-auth", "none"], width=12
         )
-        add_field(self.cloudflare_auth_mode_combo, 3, 3, sticky=tk.W)
+        add_field(tab_mail, self.cloudflare_auth_mode_combo, 1, 1, sticky=tk.W)
 
-        add_label(4, 0, "Cloudflare API Base:")
-        self.cloudflare_api_base_var = tk.StringVar(value=config.get("cloudflare_api_base", ""))
-        self.cloudflare_api_base_entry = tk_entry(config_frame, textvariable=self.cloudflare_api_base_var, width=72)
-        add_field(self.cloudflare_api_base_entry, 4, 1, columnspan=3)
-
-        add_label(5, 0, "Cloudflare API Key:")
-        self.cloudflare_api_key_var = tk.StringVar(value=config.get("cloudflare_api_key", ""))
-        self.cloudflare_api_key_entry = tk_entry(config_frame, textvariable=self.cloudflare_api_key_var, width=34)
-        add_field(self.cloudflare_api_key_entry, 5, 1)
-
-        add_label(5, 2, "CF 路径:")
+        add_label(tab_mail, 1, 2, "CF 路径:")
         self.cloudflare_paths_var = tk.StringVar(
             value=",".join(
                 [
@@ -845,75 +843,103 @@ class GrokRegisterGUI:
                 ]
             )
         )
-        self.cloudflare_paths_entry = tk_entry(config_frame, textvariable=self.cloudflare_paths_var, width=34)
-        add_field(self.cloudflare_paths_entry, 5, 3)
+        self.cloudflare_paths_entry = tk_entry(tab_mail, textvariable=self.cloudflare_paths_var, width=34)
+        add_field(tab_mail, self.cloudflare_paths_entry, 1, 3)
 
-        add_label(6, 0, "Cloud Mail API Base:")
+        add_label(tab_mail, 2, 0, "Cloudflare API Base:")
+        self.cloudflare_api_base_var = tk.StringVar(value=config.get("cloudflare_api_base", ""))
+        self.cloudflare_api_base_entry = tk_entry(tab_mail, textvariable=self.cloudflare_api_base_var, width=72)
+        add_field(tab_mail, self.cloudflare_api_base_entry, 2, 1, columnspan=3)
+
+        add_label(tab_mail, 3, 0, "Cloudflare API Key:")
+        self.cloudflare_api_key_var = tk.StringVar(value=config.get("cloudflare_api_key", ""))
+        self.cloudflare_api_key_entry = tk_entry(tab_mail, textvariable=self.cloudflare_api_key_var, width=34)
+        add_field(tab_mail, self.cloudflare_api_key_entry, 3, 1)
+
+        add_label(tab_mail, 4, 0, "Cloud Mail API Base:")
         self.cloudmail_api_base_var = tk.StringVar(value=config.get("cloudmail_api_base", ""))
-        self.cloudmail_api_base_entry = tk_entry(config_frame, textvariable=self.cloudmail_api_base_var, width=34)
-        add_field(self.cloudmail_api_base_entry, 6, 1)
+        self.cloudmail_api_base_entry = tk_entry(tab_mail, textvariable=self.cloudmail_api_base_var, width=34)
+        add_field(tab_mail, self.cloudmail_api_base_entry, 4, 1)
 
-        add_label(6, 2, "Cloud Mail 域名:")
+        add_label(tab_mail, 4, 2, "Cloud Mail 域名:")
         self.cloudmail_domains_var = tk.StringVar(value=config.get("cloudmail_domains", ""))
-        self.cloudmail_domains_entry = tk_entry(config_frame, textvariable=self.cloudmail_domains_var, width=34)
-        add_field(self.cloudmail_domains_entry, 6, 3)
+        self.cloudmail_domains_entry = tk_entry(tab_mail, textvariable=self.cloudmail_domains_var, width=34)
+        add_field(tab_mail, self.cloudmail_domains_entry, 4, 3)
 
-        add_label(7, 0, "Cloud Mail Public Token:")
+        add_label(tab_mail, 5, 0, "Cloud Mail Public Token:")
         self.cloudmail_public_token_var = tk.StringVar(value=config.get("cloudmail_public_token", ""))
-        self.cloudmail_public_token_entry = tk_entry(config_frame, textvariable=self.cloudmail_public_token_var, width=72)
-        add_field(self.cloudmail_public_token_entry, 7, 1, columnspan=3)
+        self.cloudmail_public_token_entry = tk_entry(tab_mail, textvariable=self.cloudmail_public_token_var, width=72)
+        add_field(tab_mail, self.cloudmail_public_token_entry, 5, 1, columnspan=3)
 
-        add_label(8, 0, "grok2api 本地入池:")
+        # --- 入池 ---
+        add_label(tab_pool, 0, 0, "grok2api 本地入池:")
         self.grok2api_local_auto_var = tk.BooleanVar(value=bool(config.get("grok2api_auto_add_local", True)))
-        self.grok2api_local_auto_check = tk_checkbutton(config_frame, variable=self.grok2api_local_auto_var)
-        add_field(self.grok2api_local_auto_check, 8, 1, sticky=tk.W)
+        self.grok2api_local_auto_check = tk_checkbutton(
+            tab_pool, text="启用", variable=self.grok2api_local_auto_var, bg=UI_PANEL_BG, activebackground=UI_PANEL_BG
+        )
+        add_field(tab_pool, self.grok2api_local_auto_check, 0, 1, sticky=tk.W)
 
-        add_label(8, 2, "grok2api 池名:")
+        add_label(tab_pool, 0, 2, "grok2api 池名:")
         self.grok2api_pool_name_var = tk.StringVar(value=str(config.get("grok2api_pool_name", "ssoBasic")))
         self.grok2api_pool_name_combo = tk_option_menu(
-            config_frame, self.grok2api_pool_name_var, ["ssoBasic", "ssoSuper"], width=12
+            tab_pool, self.grok2api_pool_name_var, ["ssoBasic", "ssoSuper"], width=12
         )
-        add_field(self.grok2api_pool_name_combo, 8, 3, sticky=tk.W)
+        add_field(tab_pool, self.grok2api_pool_name_combo, 0, 3, sticky=tk.W)
 
-        add_label(9, 0, "本地 token.json:")
+        add_label(tab_pool, 1, 0, "本地 token.json:")
         self.grok2api_local_file_var = tk.StringVar(value=str(config.get("grok2api_local_token_file", "")))
-        self.grok2api_local_file_entry = tk_entry(config_frame, textvariable=self.grok2api_local_file_var, width=72)
-        add_field(self.grok2api_local_file_entry, 9, 1, columnspan=3)
+        self.grok2api_local_file_entry = tk_entry(tab_pool, textvariable=self.grok2api_local_file_var, width=72)
+        add_field(tab_pool, self.grok2api_local_file_entry, 1, 1, columnspan=3)
 
-        add_label(10, 0, "grok2api 远端入池:")
+        add_label(tab_pool, 2, 0, "grok2api 远端入池:")
         self.grok2api_remote_auto_var = tk.BooleanVar(value=bool(config.get("grok2api_auto_add_remote", False)))
-        self.grok2api_remote_auto_check = tk_checkbutton(config_frame, variable=self.grok2api_remote_auto_var)
-        add_field(self.grok2api_remote_auto_check, 10, 1, sticky=tk.W)
+        self.grok2api_remote_auto_check = tk_checkbutton(
+            tab_pool, text="启用", variable=self.grok2api_remote_auto_var, bg=UI_PANEL_BG, activebackground=UI_PANEL_BG
+        )
+        add_field(tab_pool, self.grok2api_remote_auto_check, 2, 1, sticky=tk.W)
 
-        add_label(11, 0, "grok2api 远端 Base:")
+        add_label(tab_pool, 3, 0, "grok2api 远端 Base:")
         self.grok2api_remote_base_var = tk.StringVar(value=str(config.get("grok2api_remote_base", "")))
-        self.grok2api_remote_base_entry = tk_entry(config_frame, textvariable=self.grok2api_remote_base_var, width=72)
-        add_field(self.grok2api_remote_base_entry, 11, 1, columnspan=3)
+        self.grok2api_remote_base_entry = tk_entry(tab_pool, textvariable=self.grok2api_remote_base_var, width=72)
+        add_field(tab_pool, self.grok2api_remote_base_entry, 3, 1, columnspan=3)
 
-        add_label(12, 0, "grok2api 远端 app_key:")
+        add_label(tab_pool, 4, 0, "grok2api 远端 app_key:")
         self.grok2api_remote_key_var = tk.StringVar(value=str(config.get("grok2api_remote_app_key", "")))
-        self.grok2api_remote_key_entry = tk_entry(config_frame, textvariable=self.grok2api_remote_key_var, width=72)
-        add_field(self.grok2api_remote_key_entry, 12, 1, columnspan=3)
+        self.grok2api_remote_key_entry = tk_entry(tab_pool, textvariable=self.grok2api_remote_key_var, width=72)
+        add_field(tab_pool, self.grok2api_remote_key_entry, 4, 1, columnspan=3)
 
-        add_label(13, 0, "OIDC / CPA:")
+        # --- CPA ---
+        add_label(tab_cpa, 0, 0, "OIDC / CPA:")
         self.cpa_export_var = tk.BooleanVar(value=bool(config.get("cpa_export_enabled", False)))
-        self.cpa_export_check = tk_checkbutton(config_frame, text="注册成功后导出 CPA xAI OIDC", variable=self.cpa_export_var)
-        add_field(self.cpa_export_check, 13, 1, sticky=tk.W)
+        self.cpa_export_check = tk_checkbutton(
+            tab_cpa,
+            text="注册成功后导出 CPA xAI OIDC",
+            variable=self.cpa_export_var,
+            bg=UI_PANEL_BG,
+            activebackground=UI_PANEL_BG,
+        )
+        add_field(tab_cpa, self.cpa_export_check, 0, 1, sticky=tk.W)
 
-        add_label(13, 2, "CPA 输出目录:")
+        add_label(tab_cpa, 1, 0, "CPA 输出目录:")
         self.cpa_auth_dir_var = tk.StringVar(value=str(config.get("cpa_auth_dir", "./cpa_auths")))
-        self.cpa_auth_dir_entry = tk_entry(config_frame, textvariable=self.cpa_auth_dir_var, width=34)
-        add_field(self.cpa_auth_dir_entry, 13, 3)
+        self.cpa_auth_dir_entry = tk_entry(tab_cpa, textvariable=self.cpa_auth_dir_var, width=72)
+        add_field(tab_cpa, self.cpa_auth_dir_entry, 1, 1, columnspan=3)
 
-        add_label(14, 0, "9Router Grok CLI:")
+        add_label(tab_cpa, 2, 0, "9Router Grok CLI:")
         self.grok2api_grok_cli_var = tk.BooleanVar(value=bool(config.get("grok2api_auto_add_grok_cli", False)))
-        self.grok2api_grok_cli_check = tk_checkbutton(config_frame, text="注册后自动添加到 9Router Grok CLI", variable=self.grok2api_grok_cli_var)
-        add_field(self.grok2api_grok_cli_check, 14, 1, sticky=tk.W)
+        self.grok2api_grok_cli_check = tk_checkbutton(
+            tab_cpa,
+            text="注册后自动添加到 9Router Grok CLI",
+            variable=self.grok2api_grok_cli_var,
+            bg=UI_PANEL_BG,
+            activebackground=UI_PANEL_BG,
+        )
+        add_field(tab_cpa, self.grok2api_grok_cli_check, 2, 1, sticky=tk.W)
 
-        add_label(14, 2, "9Router DB 路径:")
+        add_label(tab_cpa, 3, 0, "9Router DB 路径:")
         self.grok2api_9router_db_var = tk.StringVar(value=str(config.get("grok2api_9router_db_path", "")))
-        self.grok2api_9router_db_entry = tk_entry(config_frame, textvariable=self.grok2api_9router_db_var, width=34)
-        add_field(self.grok2api_9router_db_entry, 14, 3)
+        self.grok2api_9router_db_entry = tk_entry(tab_cpa, textvariable=self.grok2api_9router_db_var, width=72)
+        add_field(tab_cpa, self.grok2api_9router_db_entry, 3, 1, columnspan=3)
 
         btn_frame = tk.Frame(main_frame, bg=UI_BG)
         btn_frame.grid(row=1, column=0, sticky=tk.EW, pady=(0, 6))

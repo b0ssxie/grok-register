@@ -409,39 +409,37 @@ def open_signup_page(log_callback=None, cancel_callback=None):
             log_callback(f"[*] 当前URL: {page.url} | 代理: {proxy_log_label()}")
         click_email_signup_button(log_callback=log_callback, cancel_callback=cancel_callback)
 
-    # 有代理池时最多换 3 个节点；没有池则 1 次代理 + 1 次直连
+    # 至少试 1 次（直连或当前代理）；启用代理池时最多再换 2 个节点
     pool_n = proxy_pool_size()
-    max_proxy_tries = min(3, pool_n) if pool_n > 1 else (1 if get_configured_proxy() else 0)
+    max_tries = min(3, pool_n) if pool_n > 1 else 1
     last_exc = None
-    for attempt in range(1, max_proxy_tries + 1):
+    for attempt in range(1, max_tries + 1):
         raise_if_cancelled(cancel_callback)
         try:
             _try_open_once()
             return
         except Exception as e:
             last_exc = e
-            if not browser_started_with_proxy:
-                break
             if log_callback:
-                log_callback(f"[!] 打开注册页失败({attempt}/{max_proxy_tries}) 代理={proxy_log_label()}: {e}")
-            if attempt < max_proxy_tries:
+                log_callback(f"[!] 打开注册页失败({attempt}/{max_tries}) 代理={proxy_log_label()}: {e}")
+            if attempt >= max_tries:
+                break
+            if pool_n > 1 and browser_started_with_proxy:
                 restart_browser(log_callback=log_callback, use_proxy=True)
                 if log_callback:
                     log_callback(f"[*] 已切换代理: {proxy_log_label()}")
             else:
                 break
 
-    # 最后回退直连
-    if get_configured_proxy() or browser_started_with_proxy:
+    # 用过代理仍失败 → 回退直连再试一次
+    if browser_started_with_proxy or get_configured_proxy():
         if log_callback:
-            log_callback(f"[!] 代理全部失败，回退直连重试: {last_exc}")
+            log_callback(f"[!] 代理失败，回退直连重试: {last_exc}")
         restart_browser(log_callback=log_callback, use_proxy=False)
         _try_open_once()
         return
 
-    if last_exc:
-        raise last_exc
-    raise Exception("打开注册页失败")
+    raise last_exc if last_exc else Exception("打开注册页失败")
 
 def has_profile_form(log_callback=None):
     refresh_active_page()

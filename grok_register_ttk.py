@@ -757,9 +757,14 @@ class GrokRegisterGUI:
         add_field(self.count_spinbox, 0, 3, sticky=tk.W)
 
         add_label(1, 0, "注册选项:")
+        opt_frame = tk.Frame(config_frame, bg=UI_PANEL_BG)
         self.nsfw_var = tk.BooleanVar(value=config.get("enable_nsfw", True))
-        self.nsfw_check = tk_checkbutton(config_frame, text="注册后开启 NSFW", variable=self.nsfw_var)
-        add_field(self.nsfw_check, 1, 1, sticky=tk.W)
+        self.nsfw_check = tk_checkbutton(opt_frame, text="注册后开启 NSFW", variable=self.nsfw_var)
+        self.nsfw_check.pack(side=tk.LEFT)
+        self.browser_headless_var = tk.BooleanVar(value=bool(config.get("browser_headless", False)))
+        self.browser_headless_check = tk_checkbutton(opt_frame, text="无头模式", variable=self.browser_headless_var)
+        self.browser_headless_check.pack(side=tk.LEFT, padx=(12, 0))
+        add_field(opt_frame, 1, 1, sticky=tk.W)
 
         add_label(1, 2, "代理（可选）:")
         self.proxy_var = tk.StringVar(value=config.get("proxy", ""))
@@ -990,6 +995,7 @@ class GrokRegisterGUI:
 
         config["email_provider"] = self.email_provider_var.get().strip() or "duckmail"
         config["enable_nsfw"] = bool(self.nsfw_var.get())
+        config["browser_headless"] = bool(self.browser_headless_var.get())
         config["proxy"] = self.proxy_var.get().strip()
         config["proxy_pool"] = self.proxy_pool_var.get().strip()
         config["proxy_pool_enabled"] = bool(self.proxy_pool_enabled_var.get())

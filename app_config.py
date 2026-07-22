@@ -22,6 +22,7 @@ DEFAULT_CONFIG = {
     "proxy": "",
     "proxy_pool": "",
     "proxy_pool_enabled": False,
+    "browser_headless": False,
     "enable_nsfw": True,
     "register_count": 1,
     "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
@@ -93,7 +94,7 @@ def validate_config_structure(raw):
         raise ConfigError("config root must be a JSON object")
     cfg = {**DEFAULT_CONFIG, **raw}
     bool_keys = (
-        "enable_nsfw", "proxy_pool_enabled",
+        "enable_nsfw", "proxy_pool_enabled", "browser_headless",
         "grok2api_auto_add_local", "grok2api_auto_add_remote",
         "grok2api_allow_legacy_full_save", "grok2api_auto_add_grok_cli",
         "cpa_export_enabled",

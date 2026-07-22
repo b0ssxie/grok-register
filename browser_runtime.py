@@ -190,13 +190,23 @@ def apply_browser_proxy_option(options, proxy):
         options.set_argument("--proxy-server", proxy)
 
 
-def create_browser_options(browser_proxy="", extension_path=None):
+def create_browser_options(browser_proxy="", extension_path=None, headless=None):
     options = ChromiumOptions()
     options.auto_port()
     options.set_timeouts(base=1)
     apply_browser_proxy_option(options, browser_proxy)
+    if headless is None:
+        headless = bool(_config.get("browser_headless", False))
+    if headless:
+        try:
+            options.headless(True)
+        except Exception:
+            options.set_argument("--headless=new")
+        options.set_argument("--disable-gpu")
+        options.set_argument("--window-size=1280,900")
     effective_extension = _extension_path if extension_path is None else str(extension_path or "")
     if effective_extension and os.path.exists(effective_extension):
+        # 扩展在 headless 下常不可用，仍尝试加载
         options.add_extension(effective_extension)
     return options
 

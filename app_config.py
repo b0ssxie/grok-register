@@ -23,6 +23,7 @@ DEFAULT_CONFIG = {
     "proxy_pool": "",
     "proxy_pool_enabled": False,
     "browser_headless": False,
+    "concurrent_workers": 1,
     "enable_nsfw": True,
     "register_count": 1,
     "user_agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/138.0.0.0 Safari/537.36",
@@ -104,6 +105,7 @@ def validate_config_structure(raw):
     for key in bool_keys:
         cfg[key] = _require_bool(cfg, key)
     cfg["register_count"] = _require_int(cfg, "register_count", 1, 2500)
+    cfg["concurrent_workers"] = _require_int(cfg, "concurrent_workers", 1, 8)
     cfg["cpa_mint_timeout_sec"] = _require_int(cfg, "cpa_mint_timeout_sec", 30, 1800)
     cfg["cpa_oidc_request_timeout_sec"] = _require_int(cfg, "cpa_oidc_request_timeout_sec", 3, 120)
     cfg["cpa_oidc_poll_timeout_sec"] = _require_int(cfg, "cpa_oidc_poll_timeout_sec", 3, 120)

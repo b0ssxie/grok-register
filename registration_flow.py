@@ -1,5 +1,7 @@
 """编排 GUI 与 CLI 共用的单账号注册和批量执行流程。"""
+from concurrent.futures import ThreadPoolExecutor
 from dataclasses import dataclass, field
+from threading import Lock
 from typing import Any, Callable, Dict, Optional, Tuple
 
 
@@ -61,6 +63,7 @@ class RegistrationSettings:
     max_mail_retry: int = 3
     max_slot_retry: int = 3
     cleanup_interval: int = 5
+    workers: int = 1
 
 
 @dataclass
@@ -241,16 +244,37 @@ def _prepare_next_account(result, settings, callbacks, ops):
         return False
 
 
-def run_batch(count, callbacks, observer, ops, enable_nsfw=True, cleanup_interval=5,
-              max_slot_retry=3, max_mail_retry=3, settings=None):
-    if settings is None:
-        settings = RegistrationSettings(
-            count=int(count),
-            enable_nsfw=bool(enable_nsfw),
-            cleanup_interval=int(cleanup_interval),
-            max_slot_retry=int(max_slot_retry),
-            max_mail_retry=int(max_mail_retry),
+def _apply_success_stats(result, account, output, callbacks):
+    result.results.append({"registration": account, "output": output})
+    result.processed_count += 1
+    if output.saved:
+        result.success_count += 1
+        callbacks.log(f"[+] 注册并保存成功: {account.email}")
+    else:
+        result.fail_count += 1
+        result.registered_unsaved_count += 1
+        callbacks.log(f"[-] 注册成功但持久化未完成: {account.email}")
+    pool_warning = any(
+        isinstance(state, dict) and state.get("enabled") and not state.get("ok")
+        for state in output.pools.values()
+    )
+    cpa_warning = bool(
+        output.cpa
+        and not output.cpa.get("skipped")
+        and (
+            not output.cpa.get("ok")
+            or output.cpa.get("warning")
+            or output.cpa.get("cpa_copy_error")
         )
+    )
+    grok_cli_warning = bool(output.grok_cli.get("enabled") and not output.grok_cli.get("ok"))
+    if output.cpa.get("ok"):
+        result.cpa_success_count += 1
+    if pool_warning or cpa_warning or grok_cli_warning:
+        result.postprocess_warning_count += 1
+
+
+def _run_batch_sequential(settings, callbacks, observer, ops):
     result = BatchResult()
     retry_count_for_slot = 0
     last_cleanup_success_count = 0
@@ -273,48 +297,21 @@ def run_batch(count, callbacks, observer, ops, enable_nsfw=True, cleanup_interva
                     max_mail_retry=settings.max_mail_retry,
                 )
                 output = persist_account_result(account, callbacks, ops)
-                result.results.append({"registration": account, "output": output})
                 retry_count_for_slot = 0
-                result.processed_count += 1
-                if output.saved:
-                    result.success_count += 1
-                    callbacks.log(f"[+] 注册并保存成功: {account.email}")
-                    if (
-                        settings.cleanup_interval > 0
-                        and result.success_count % settings.cleanup_interval == 0
-                        and result.success_count != last_cleanup_success_count
-                        and result.processed_count < settings.count
-                    ):
-                        _run_cleanup_safely(
-                            ops,
-                            callbacks,
-                            f"已成功 {result.success_count} 个账号，执行定期清理",
-                        )
-                        last_cleanup_success_count = result.success_count
-                else:
-                    result.fail_count += 1
-                    result.registered_unsaved_count += 1
-                    callbacks.log(f"[-] 注册成功但持久化未完成: {account.email}")
-                pool_warning = any(
-                    isinstance(state, dict) and state.get("enabled") and not state.get("ok")
-                    for state in output.pools.values()
-                )
-                cpa_warning = bool(
-                    output.cpa
-                    and not output.cpa.get("skipped")
-                    and (
-                        not output.cpa.get("ok")
-                        or output.cpa.get("warning")
-                        or output.cpa.get("cpa_copy_error")
+                _apply_success_stats(result, account, output, callbacks)
+                if (
+                    output.saved
+                    and settings.cleanup_interval > 0
+                    and result.success_count % settings.cleanup_interval == 0
+                    and result.success_count != last_cleanup_success_count
+                    and result.processed_count < settings.count
+                ):
+                    _run_cleanup_safely(
+                        ops,
+                        callbacks,
+                        f"已成功 {result.success_count} 个账号，执行定期清理",
                     )
-                )
-                grok_cli_warning = bool(
-                    output.grok_cli.get("enabled") and not output.grok_cli.get("ok")
-                )
-                if output.cpa.get("ok"):
-                    result.cpa_success_count += 1
-                if pool_warning or cpa_warning or grok_cli_warning:
-                    result.postprocess_warning_count += 1
+                    last_cleanup_success_count = result.success_count
             except ops.cancelled_exception:
                 result.cancelled = True
                 callbacks.log("[!] 注册被停止")
@@ -345,4 +342,111 @@ def run_batch(count, callbacks, observer, ops, enable_nsfw=True, cleanup_interva
     finally:
         _run_cleanup_safely(ops, callbacks, "任务结束")
     return result
+
+
+def _run_batch_parallel(settings, callbacks, observer, ops):
+    result = BatchResult()
+    lock = Lock()
+    next_index = 0
+    workers = max(1, min(int(settings.workers), int(settings.count)))
+
+    def worker_log(msg):
+        callbacks.log(msg)
+
+    def run_one_slot(slot_no):
+        nonlocal next_index
+        local_callbacks = RegistrationCallbacks(log=worker_log, cancelled=callbacks.cancelled)
+        retries = 0
+        try:
+            ops.start_browser()
+            worker_log(f"[W{slot_no}] 浏览器已启动")
+            while True:
+                if callbacks.cancelled():
+                    with lock:
+                        result.cancelled = True
+                    return
+                with lock:
+                    if next_index >= settings.count or result.cancelled:
+                        return
+                    next_index += 1
+                    idx = next_index
+                worker_log(f"--- [W{slot_no}] 开始第 {idx}/{settings.count} 个账号 ---")
+                try:
+                    account = register_one_account(
+                        local_callbacks,
+                        ops,
+                        enable_nsfw=settings.enable_nsfw,
+                        max_mail_retry=settings.max_mail_retry,
+                    )
+                    output = persist_account_result(account, local_callbacks, ops)
+                    with lock:
+                        _apply_success_stats(result, account, output, callbacks)
+                        _notify_observer(observer, result, account, output, callbacks)
+                    retries = 0
+                    if ops.browser_missing():
+                        ops.start_browser()
+                    else:
+                        ops.restart_browser()
+                    ops.sleep(0.5)
+                except ops.cancelled_exception:
+                    with lock:
+                        result.cancelled = True
+                    worker_log(f"[W{slot_no}] 注册被停止")
+                    return
+                except ops.retry_exception as exc:
+                    retries += 1
+                    if retries <= settings.max_slot_retry:
+                        worker_log(
+                            f"[W{slot_no}] 当前账号流程卡住，重试第 {retries}/{settings.max_slot_retry} 次: {exc}"
+                        )
+                        ops.restart_browser()
+                        continue
+                    with lock:
+                        result.fail_count += 1
+                        result.processed_count += 1
+                        _notify_observer(observer, result, None, None, callbacks)
+                    worker_log(f"[W{slot_no}] 当前账号已达到最大重试次数，跳过: {exc}")
+                    retries = 0
+                    ops.restart_browser()
+                except Exception as exc:
+                    with lock:
+                        result.fail_count += 1
+                        result.processed_count += 1
+                        _notify_observer(observer, result, None, None, callbacks)
+                    worker_log(f"[W{slot_no}] 注册失败: {exc}")
+                    retries = 0
+                    try:
+                        ops.restart_browser()
+                    except Exception:
+                        pass
+        finally:
+            try:
+                ops.cleanup(f"worker-{slot_no} 结束")
+            except Exception as exc:
+                worker_log(f"[W{slot_no}] 清理失败: {exc}")
+
+    callbacks.log(f"[*] 并发注册 workers={workers}")
+    with ThreadPoolExecutor(max_workers=workers) as pool:
+        futures = [pool.submit(run_one_slot, i + 1) for i in range(workers)]
+        for fut in futures:
+            fut.result()
+    return result
+
+
+def run_batch(count, callbacks, observer, ops, enable_nsfw=True, cleanup_interval=5,
+              max_slot_retry=3, max_mail_retry=3, workers=1, settings=None):
+    if settings is None:
+        settings = RegistrationSettings(
+            count=int(count),
+            enable_nsfw=bool(enable_nsfw),
+            cleanup_interval=int(cleanup_interval),
+            max_slot_retry=int(max_slot_retry),
+            max_mail_retry=int(max_mail_retry),
+            workers=max(1, int(workers or 1)),
+        )
+    workers = max(1, min(int(getattr(settings, "workers", 1) or 1), 8))
+    settings.workers = workers
+    if workers <= 1:
+        return _run_batch_sequential(settings, callbacks, observer, ops)
+    return _run_batch_parallel(settings, callbacks, observer, ops)
 

@@ -576,7 +576,7 @@ def maybe_export_cpa_xai_after_success(email, password, sso="", log_callback=Non
         return {"ok": False, "error": str(exc)}
     current_page = None
     try:
-        current_page = _registration_browser.page
+        current_page = _registration_browser.get_page()
     except Exception:
         current_page = None
     try:
@@ -640,7 +640,7 @@ def run_registration_common(count, log_callback, cancel_callback, accounts_outpu
     operations = RegistrationOperations(
         start_browser=lambda: start_browser(log_callback=log_callback),
         restart_browser=lambda: restart_browser(log_callback=log_callback),
-        browser_missing=lambda: _registration_browser.browser is None,
+        browser_missing=lambda: _registration_browser.get_browser() is None,
         open_signup_page=lambda: open_signup_page(log_callback=log_callback, cancel_callback=cancel_callback),
         fill_email_and_submit=lambda: fill_email_and_submit(log_callback=log_callback, cancel_callback=cancel_callback),
         save_mail_credential=lambda email, token: _save_mail_credential(email, token, log_callback),
@@ -670,6 +670,7 @@ def run_registration_common(count, log_callback, cancel_callback, accounts_outpu
         cleanup_interval=MEMORY_CLEANUP_INTERVAL,
         max_slot_retry=3,
         max_mail_retry=3,
+        workers=int(config.get("concurrent_workers") or 1),
     )
 
 
@@ -738,13 +739,14 @@ class GrokRegisterGUI:
         self.email_provider_combo = tk_option_menu(config_frame, self.email_provider_var, ["duckmail", "yyds", "cloudflare", "cloudmail"], width=12)
         add_field(self.email_provider_combo, 0, 1, sticky=tk.W)
 
-        add_label(0, 2, "注册数量:")
+        add_label(0, 2, "数量/并发:")
+        count_frame = tk.Frame(config_frame, bg=UI_PANEL_BG)
         self.count_var = tk.StringVar(value=str(config.get("register_count", 1)))
         self.count_spinbox = tk.Spinbox(
-            config_frame,
+            count_frame,
             from_=1,
             to=2500,
-            width=8,
+            width=6,
             textvariable=self.count_var,
             bg=UI_ENTRY_BG,
             fg=UI_FG,
@@ -754,7 +756,25 @@ class GrokRegisterGUI:
             disabledforeground=UI_MUTED_FG,
             relief=tk.SOLID,
         )
-        add_field(self.count_spinbox, 0, 3, sticky=tk.W)
+        self.count_spinbox.pack(side=tk.LEFT)
+        tk_label(count_frame, text="并发", bg=UI_PANEL_BG).pack(side=tk.LEFT, padx=(8, 4))
+        self.workers_var = tk.StringVar(value=str(config.get("concurrent_workers", 1)))
+        self.workers_spinbox = tk.Spinbox(
+            count_frame,
+            from_=1,
+            to=8,
+            width=4,
+            textvariable=self.workers_var,
+            bg=UI_ENTRY_BG,
+            fg=UI_FG,
+            insertbackground=UI_FG,
+            buttonbackground=UI_BUTTON_BG,
+            disabledbackground="#2f2f2f",
+            disabledforeground=UI_MUTED_FG,
+            relief=tk.SOLID,
+        )
+        self.workers_spinbox.pack(side=tk.LEFT)
+        add_field(count_frame, 0, 3, sticky=tk.W)
 
         add_label(1, 0, "注册选项:")
         opt_frame = tk.Frame(config_frame, bg=UI_PANEL_BG)
@@ -1025,6 +1045,7 @@ class GrokRegisterGUI:
         try:
             count = int(self.count_var.get())
             config["register_count"] = count
+            config["concurrent_workers"] = int(self.workers_var.get() or 1)
             validated = validate_run_requirements(config)
             config.clear()
             config.update(validated)

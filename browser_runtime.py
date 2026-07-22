@@ -10,10 +10,14 @@ from cpa_xai.proxyutil import (
     proxy_for_chromium,
 )
 
+import threading
+
 _config = {}
 _extension_path = ""
 _proxy_pool = []
 _proxy_pool_index = 0
+_proxy_pool_lock = threading.Lock()
+_thread_proxy = threading.local()
 
 
 def configure_runtime(config_ref, extension_path=""):
@@ -29,17 +33,22 @@ def configure_runtime(config_ref, extension_path=""):
 
 
 def get_configured_proxy():
+    thread_proxy = getattr(_thread_proxy, "value", None)
+    if thread_proxy is not None:
+        return str(thread_proxy or "").strip()
     return str(_config.get("proxy", "") or "").strip()
 
 
 def cycle_proxy():
     global _proxy_pool_index
-    if _proxy_pool:
-        proxy = _proxy_pool[_proxy_pool_index % len(_proxy_pool)]
-        _proxy_pool_index = (_proxy_pool_index + 1) % len(_proxy_pool)
-        _config["proxy"] = proxy
-        return proxy
-    return get_configured_proxy()
+    with _proxy_pool_lock:
+        if _proxy_pool:
+            proxy = _proxy_pool[_proxy_pool_index % len(_proxy_pool)]
+            _proxy_pool_index = (_proxy_pool_index + 1) % len(_proxy_pool)
+        else:
+            proxy = str(_config.get("proxy", "") or "").strip()
+    _thread_proxy.value = proxy
+    return proxy
 
 
 def proxy_pool_size():

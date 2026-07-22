@@ -141,11 +141,12 @@ def is_proxy_connection_error(exc):
 
 
 def page_has_proxy_error(page_obj):
+    """True when page is not a usable signup page (proxy/network/CF block)."""
     try:
         url = str(getattr(page_obj, "url", "") or "")
         title = str(page_obj.run_js("return document.title || ''") or "")
         body = str(page_obj.run_js("return document.body ? document.body.innerText.slice(0, 2000) : ''") or "")
-        html = str(getattr(page_obj, "html", "") or "")[:1500]
+        html = str(getattr(page_obj, "html", "") or "")[:2500]
     except Exception:
         return False
     text = ("%s\n%s\n%s\n%s" % (url, title, body, html)).lower()
@@ -157,12 +158,24 @@ def page_has_proxy_error(page_obj):
         "无法连接到代理服务器", "代理服务器", "无法访问此网站",
         "网页可能暂时无法连接", "该网页无法正常运作",
         "took too long to respond", "connection timed out",
-        # Chromium 内置错误页特征（title 可能仍是目标域名）
+        # Chromium 内置错误页
         "copyright 2017 the chromium authors",
         "dnserror-no-server-hostname",
         "main-frame-error",
         "error-code",
         "sub-frame-error",
+        # Cloudflare 拦截/挑战页
+        "attention required",
+        "just a moment",
+        "checking your browser",
+        "cf-error-details",
+        "cf-browser-verification",
+        "cf-challenge",
+        "challenge-platform",
+        "enable javascript and cookies",
+        "sorry, you have been blocked",
+        "why have i been blocked",
+        "cloudflare ray id",
     ))
 
 

@@ -303,12 +303,11 @@ def refresh_active_page():
     return _ns().page
 
 def click_email_signup_button(timeout=10, log_callback=None, cancel_callback=None):
-    pass
     deadline = time.time() + timeout
     while time.time() < deadline:
         raise_if_cancelled(cancel_callback)
         if page_has_proxy_error(_ns().page):
-            raise Exception('注册页代理/网络错误（无法加载真实页面）')
+            raise Exception('注册页被 Cloudflare/网络拦截（非真实注册页）')
         if log_callback:
             log_callback('[Debug] 尝试查找“使用邮箱注册”按钮...')
         clicked = _ns().page.run_js('\nfunction isVisible(node) {\n    if (!node) return false;\n    const style = window.getComputedStyle(node);\n    if (style.display === \'none\' || style.visibility === \'hidden\' || style.opacity === \'0\') return false;\n    const rect = node.getBoundingClientRect();\n    return rect.width > 0 && rect.height > 0;\n}\nfunction nodeText(node) {\n    return [\n        node.innerText,\n        node.textContent,\n        node.getAttribute(\'aria-label\'),\n        node.getAttribute(\'title\'),\n        node.getAttribute(\'href\'),\n    ].filter(Boolean).join(\' \').replace(/\\s+/g, \' \').trim();\n}\nfunction scoreEntry(node) {\n    const compact = nodeText(node).replace(/\\s+/g, \'\');\n    const lower = compact.toLowerCase();\n    if (compact.includes(\'使用邮箱注册\')) return 100;\n    if (lower.includes(\'signupwithemail\')) return 95;\n    if (lower.includes(\'continuewithemail\')) return 90;\n    if (lower.includes(\'email\') && (lower.includes(\'sign\') || lower.includes(\'continue\') || lower.includes(\'use\') || lower.includes(\'with\'))) return 80;\n    if (lower === \'email\' || lower.includes(\'邮箱\')) return 70;\n    return 0;\n}\nconst candidates = Array.from(document.querySelectorAll(\'button, a, [role="button"]\'))\n    .filter((node) => isVisible(node) && !node.disabled && node.getAttribute(\'aria-disabled\') !== \'true\')\n    .map((node) => ({ node, score: scoreEntry(node), text: nodeText(node) }))\n    .filter((item) => item.score > 0)\n    .sort((a, b) => b.score - a.score);\nconst target = candidates[0]?.node || null;\nif (!target) {\n    return false;\n}\ntarget.click();\nreturn candidates[0].text || true;\n        ')
@@ -325,6 +324,8 @@ def click_email_signup_button(timeout=10, log_callback=None, cancel_callback=Non
     if log_callback:
         page_html = _ns().page.html[:500] if _ns().page else 'no page'
         log_callback(f'[Debug] 页面内容片段: {page_html}')
+    if page_has_proxy_error(_ns().page):
+        raise Exception('注册页被 Cloudflare/网络拦截（非真实注册页）')
     raise Exception('未找到「使用邮箱注册」按钮')
 
 def open_signup_page(log_callback=None, cancel_callback=None):
@@ -353,10 +354,10 @@ def open_signup_page(log_callback=None, cancel_callback=None):
         _open_with_current_browser()
         sleep_with_cancel(1.5, cancel_callback)
         if _page_is_broken():
-            raise Exception('注册页代理/网络错误（无法加载真实页面）')
+            raise Exception('注册页被 Cloudflare/网络拦截（非真实注册页）')
         if log_callback:
             log_callback(f'[*] 当前URL: {_ns().page.url} | 代理: {proxy_log_label()}')
-        click_email_signup_button(log_callback=log_callback, cancel_callback=cancel_callback)
+        click_email_signup_button(log_callback=log_callback, cancel_callback=cancel_callback, timeout=8)
     pool_n = proxy_pool_size()
     max_tries = min(3, pool_n) if pool_n > 1 else 1
     last_exc = None

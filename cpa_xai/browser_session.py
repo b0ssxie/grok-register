@@ -343,6 +343,20 @@ def release_mint_browser(owned: bool, success: bool, log: Optional[LogFn] = None
         state["served"] = int(state.get("served", 0) or 0) + 1
         logger("mint browser served=%s" % state["served"])
 
+def discard_mint_browser(browser: Any, log: Optional[LogFn] = None) -> None:
+    """Close browser and drop TLS reuse state if it points at this instance."""
+    logger = log or _noop_log
+    if browser is None:
+        return
+    state = _mint_tls_get()
+    if state.get("browser") is browser:
+        state.update({"browser": None, "page": None, "served": 0, "proxy": None, "headless": None})
+    try:
+        close_standalone(browser)
+        logger("mint browser discarded")
+    except Exception as exc:
+        logger("discard mint browser failed: %s" % exc)
+
 def shutdown_mint_browsers() -> None:
     state = _mint_tls_get()
     with _mint_registry_lock:

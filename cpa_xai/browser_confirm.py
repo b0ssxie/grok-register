@@ -17,7 +17,7 @@ LogFn = Callable[[str], None]
 from .browser_session import (
     BrowserConfirmError, _noop_log, _sleep, create_standalone_page, close_standalone,
     clear_page_session, normalize_cookies, inject_cookies, acquire_mint_browser,
-    release_mint_browser, shutdown_mint_browsers,
+    release_mint_browser, discard_mint_browser, shutdown_mint_browsers,
 )
 
 
@@ -660,17 +660,6 @@ def mint_with_browser(
         if "token" in token_box:
             token_result = token_box["token"]
             success = True
-            # owned=False 时复用浏览器，不能 close 唯一标签页，否则下次 clear_page_session 拿到死 page
-            if owned:
-                try:
-                    work_page.close()
-                except Exception:
-                    pass
-            else:
-                try:
-                    work_page.get("about:blank")
-                except Exception:
-                    pass
             return {
                 "access_token": token_result.access_token,
                 "refresh_token": token_result.refresh_token,
@@ -684,12 +673,9 @@ def mint_with_browser(
             raise error_box["err"]
         raise OAuthDeviceError("token poll thread ended without result")
     finally:
+        # 每次导出后都关掉 CPA 浏览器，避免留下 about:blank 窗口
         if own_browser is not None:
-            if owned:
-                logger("[cpa] closing own CPA browser")
-                close_standalone(own_browser)
-            else:
-                logger("[cpa] releasing shared CPA browser")
-                release_mint_browser(owned=False, success=success, log=logger)
+            logger("[cpa] closing CPA browser")
+            discard_mint_browser(own_browser, log=logger)
         else:
             logger("[cpa] no own browser to close")

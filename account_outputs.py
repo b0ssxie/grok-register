@@ -42,6 +42,35 @@ def queue_unsaved_account(path, payload, error):
     return True
 
 
+def merge_account_files(inputs, output=None):
+    seen = set()
+    total = 0
+    header = None
+    for path in inputs:
+        path = os.path.realpath(os.path.abspath(os.path.expanduser(str(path))))
+        if not os.path.isfile(path):
+            raise FileNotFoundError(f"文件不存在: {path}")
+        with open(path, "r", encoding="utf-8", errors="replace") as handle:
+            for raw in handle:
+                total += 1
+                parts = raw.rstrip("\n").split("----", 2)
+                if len(parts) == 3:
+                    key = (parts[0].strip(), parts[2].strip())
+                    if key not in seen:
+                        seen.add(key)
+                        if output:
+                            append_account_line(output, *parts)
+                    else:
+                        pass
+                else:
+                    pass
+    count = len(seen)
+    skipped = total - count
+    if output:
+        return {"total": total, "unique": count, "duplicates_skipped": skipped, "output": os.path.realpath(output)}
+    return {"total": total, "unique": count, "duplicates_skipped": skipped, "output": None}
+
+
 def _existing_account_keys(target_path):
     keys = set()
     if not os.path.isfile(target_path):

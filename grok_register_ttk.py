@@ -3,15 +3,15 @@
 """GUI 与 CLI 主入口，并为拆分后的注册模块保留兼容适配。"""
 
 try:
+    import customtkinter as ctk
     import tkinter as tk
-    from tkinter import ttk, messagebox, scrolledtext
+    from tkinter import messagebox
     TK_AVAILABLE = True
     TK_IMPORT_ERROR = None
 except ImportError as exc:
+    ctk = None
     tk = None
-    ttk = None
     messagebox = None
-    scrolledtext = None
     TK_AVAILABLE = False
     TK_IMPORT_ERROR = exc
 import threading
@@ -58,13 +58,7 @@ from app_config import (
 
 MEMORY_CLEANUP_INTERVAL = 5
 
-UI_BG = "#242424"
-UI_PANEL_BG = "#2b2b2b"
-UI_FG = "#f2f2f2"
-UI_MUTED_FG = "#b8b8b8"
-UI_ENTRY_BG = "#333333"
-UI_BUTTON_BG = "#3a3a3a"
-UI_ACTIVE_BG = "#4a6078"
+
 
 
 
@@ -434,120 +428,6 @@ def sleep_with_cancel(seconds, cancel_callback=None):
 
 
 
-def setup_light_theme(root):
-    try:
-        root.option_add("*Background", UI_BG)
-        root.option_add("*Foreground", UI_FG)
-        root.option_add("*selectBackground", UI_ACTIVE_BG)
-        root.option_add("*selectForeground", UI_FG)
-        root.option_add("*insertBackground", UI_FG)
-        root.option_add("*Entry.Background", UI_ENTRY_BG)
-        root.option_add("*Text.Background", UI_ENTRY_BG)
-        root.option_add("*Menu.Background", UI_ENTRY_BG)
-        root.option_add("*Menu.Foreground", UI_FG)
-        style = ttk.Style(root)
-        available = set(style.theme_names())
-        if "clam" in available:
-            style.theme_use("clam")
-        elif "default" in available:
-            style.theme_use("default")
-        root.configure(bg=UI_BG)
-        style.configure(".", background=UI_BG, foreground=UI_FG, fieldbackground=UI_ENTRY_BG)
-        style.configure("TFrame", background=UI_BG)
-        style.configure("TLabelframe", background=UI_BG, foreground=UI_FG)
-        style.configure("TLabelframe.Label", background=UI_BG, foreground=UI_FG)
-        style.configure("TLabel", background=UI_BG, foreground=UI_FG)
-        style.configure("TCheckbutton", background=UI_BG, foreground=UI_FG)
-        style.configure("TButton", background=UI_BUTTON_BG, foreground=UI_FG)
-        style.configure("TEntry", fieldbackground=UI_ENTRY_BG, foreground=UI_FG)
-        style.configure("TCombobox", fieldbackground=UI_ENTRY_BG, foreground=UI_FG)
-        style.configure("TSpinbox", fieldbackground=UI_ENTRY_BG, foreground=UI_FG)
-        style.configure("TNotebook", background=UI_BG, borderwidth=0)
-        style.configure(
-            "TNotebook.Tab",
-            background=UI_BUTTON_BG,
-            foreground=UI_FG,
-            padding=[12, 4],
-        )
-        style.map(
-            "TNotebook.Tab",
-            background=[("selected", UI_PANEL_BG), ("active", UI_ACTIVE_BG)],
-            foreground=[("selected", UI_FG), ("active", UI_FG)],
-        )
-        style.configure("Tab.TFrame", background=UI_PANEL_BG)
-    except Exception:
-        pass
-
-
-def tk_label(parent, text="", **kwargs):
-    return tk.Label(parent, text=text, bg=kwargs.pop("bg", UI_BG), fg=kwargs.pop("fg", UI_FG), **kwargs)
-
-
-def tk_entry(parent, textvariable=None, width=30, **kwargs):
-    return tk.Entry(
-        parent,
-        textvariable=textvariable,
-        width=width,
-        bg=UI_ENTRY_BG,
-        fg=UI_FG,
-        insertbackground=UI_FG,
-        disabledbackground="#2f2f2f",
-        disabledforeground=UI_MUTED_FG,
-        highlightthickness=1,
-        highlightbackground="#555555",
-        relief=tk.SOLID,
-        **kwargs,
-    )
-
-
-def tk_button(parent, text="", command=None, state="normal", **kwargs):
-    return tk.Button(
-        parent,
-        text=text,
-        command=command,
-        state=state,
-        bg=UI_BUTTON_BG,
-        fg=UI_FG,
-        activebackground=UI_ACTIVE_BG,
-        activeforeground=UI_FG,
-        disabledforeground="#777777",
-        relief=tk.RAISED,
-        padx=10,
-        pady=3,
-        **kwargs,
-    )
-
-
-def tk_checkbutton(parent, text="", variable=None, **kwargs):
-    bg = kwargs.pop("bg", UI_BG)
-    return tk.Checkbutton(
-        parent,
-        text=text,
-        variable=variable,
-        bg=bg,
-        fg=kwargs.pop("fg", UI_FG),
-        activebackground=kwargs.pop("activebackground", bg),
-        activeforeground=kwargs.pop("activeforeground", UI_FG),
-        selectcolor="#3d7be0",
-        **kwargs,
-    )
-
-
-def tk_option_menu(parent, variable, values, width=12):
-    menu = tk.OptionMenu(parent, variable, *values)
-    menu.configure(
-        width=width,
-        bg=UI_ENTRY_BG,
-        fg=UI_FG,
-        activebackground=UI_ACTIVE_BG,
-        activeforeground=UI_FG,
-        highlightthickness=1,
-        highlightbackground="#555555",
-        relief=tk.SOLID,
-    )
-    menu["menu"].configure(bg=UI_ENTRY_BG, fg=UI_FG, activebackground=UI_ACTIVE_BG, activeforeground=UI_FG)
-    return menu
-
 
 
 
@@ -648,6 +528,19 @@ def retry_pending_file(pending_path, output_path=None, log_callback=None):
     return _retry_pending_file(pending_path, output_path=output_path, log_callback=log_callback)
 
 
+def merge_account_files(inputs, output=None):
+    from glob import glob as _glob
+    expanded = []
+    for item in inputs:
+        matched = _glob(item)
+        if matched:
+            expanded.extend(matched)
+        else:
+            expanded.append(item)
+    from account_outputs import merge_account_files as _merge
+    return _merge(expanded, output=output)
+
+
 def run_registration_common(count, log_callback, cancel_callback, accounts_output_file, observer):
     from registration_flow import RegistrationCallbacks, RegistrationOperations, run_batch
     callbacks = RegistrationCallbacks(log=log_callback, cancelled=cancel_callback)
@@ -688,19 +581,29 @@ def run_registration_common(count, log_callback, cancel_callback, accounts_outpu
     )
 
 
+_FONT_FAMILY = "Segoe UI"
+_MONO_FAMILY = "Cascadia Code" if os.name == "nt" else "Consolas"
+_FONT_TAB = 11
+_FONT_LABEL = 11
+_FONT_SECTION = 12
+_FONT_HEADER = 15
+_FONT_MONO = 11
+_FONT_STATS = 11
+
+
 class GrokRegisterGUI:
     def __init__(self, root):
         self.root = root
         self.root.title("Grok 注册机")
-        self.root.geometry("1000x720")
-        self.root.minsize(880, 600)
+        self.root.geometry("960x700")
+        self.root.minsize(860, 580)
         self.is_running = False
         self.batch_count = 0
         self.success_count = 0
         self.fail_count = 0
+        self.cpa_success_count = 0
         self.registered_unsaved_count = 0
         self.postprocess_warning_count = 0
-        self.cpa_success_count = 0
         self.results = []
         self.stop_requested = False
         self.ui_queue = queue.Queue()
@@ -710,282 +613,249 @@ class GrokRegisterGUI:
 
     def setup_ui(self):
         load_config()
-        main_frame = tk.Frame(self.root, bg=UI_BG, padx=10, pady=10)
-        main_frame.pack(fill=tk.BOTH, expand=True)
-        main_frame.grid_columnconfigure(0, weight=1)
-        main_frame.grid_rowconfigure(3, weight=1)
+        self.root.grid_columnconfigure(0, weight=1)
+        self.root.grid_rowconfigure(3, weight=1)
 
-        notebook = ttk.Notebook(main_frame)
-        notebook.grid(row=0, column=0, sticky=tk.EW, pady=(0, 8))
+        header = ctk.CTkFrame(self.root, fg_color="transparent", height=36)
+        header.grid(row=0, column=0, sticky="ew")
+        header.grid_propagate(False)
+        header.grid_columnconfigure(0, weight=1)
+        ctk.CTkLabel(header, text="Grok 注册机", font=(_FONT_FAMILY, _FONT_HEADER, "bold"),
+                      text_color=("#1d1d1f", "#ffffff")).grid(row=0, column=0, pady=8)
 
-        def make_tab(title):
-            frame = ttk.Frame(notebook, style="Tab.TFrame", padding=10)
-            notebook.add(frame, text=title)
-            inner = tk.Frame(frame, bg=UI_PANEL_BG)
-            inner.pack(fill=tk.BOTH, expand=True)
-            inner.grid_columnconfigure(1, weight=1, minsize=220)
-            inner.grid_columnconfigure(3, weight=1, minsize=220)
-            return inner
+        tabview = ctk.CTkTabview(self.root, anchor="w", segmented_button_font=(_FONT_FAMILY, _FONT_TAB))
+        tabview.grid(row=1, column=0, sticky="ew", padx=12, pady=(8, 0))
 
-        tab_basic = make_tab("基础")
-        tab_mail = make_tab("邮箱")
-        tab_pool = make_tab("入池")
-        tab_cpa = make_tab("CPA")
+        tab_basic = tabview.add("基础")
+        tab_mail = tabview.add("邮箱")
+        tab_pool = tabview.add("入池")
+        tab_cpa = tabview.add("CPA")
+
+        for t in (tab_basic, tab_mail, tab_pool, tab_cpa):
+            t.grid_columnconfigure(0, weight=1)
+
+        def card(parent):
+            f = ctk.CTkFrame(parent, fg_color=("#f2f2f5", "#2b2b2b"), border_width=1,
+                             border_color=("#d4d4d8", "#3a3a3a"))
+            f.grid_columnconfigure(1, weight=1, minsize=200)
+            f.grid_columnconfigure(3, weight=1, minsize=200)
+            return f
 
         def add_label(parent, row, column, text):
-            tk_label(parent, text=text, bg=UI_PANEL_BG).grid(
-                row=row, column=column, sticky=tk.W, padx=(0, 6), pady=4,
-            )
+            ctk.CTkLabel(parent, text=text, font=(_FONT_FAMILY, _FONT_LABEL),
+                          text_color=("#5a5a5a", "#bbbbbb")).grid(
+                row=row, column=column, sticky="w", padx=(0, 8), pady=5)
 
-        def add_field(parent, widget, row, column, columnspan=1, sticky=tk.EW):
-            widget.grid(
-                row=row, column=column, columnspan=columnspan,
-                sticky=sticky, padx=(0, 12), pady=4,
-            )
+        def add_field(parent, widget, row, column, columnspan=1, sticky="ew"):
+            widget.grid(row=row, column=column, columnspan=columnspan, sticky=sticky, padx=(0, 10), pady=5)
 
-        # --- 基础 ---
-        add_label(tab_basic, 0, 0, "邮箱服务商:")
+        def section(parent, title):
+            ctk.CTkLabel(parent, text=title, font=(_FONT_FAMILY, _FONT_SECTION, "bold"),
+                          text_color=("#1d1d1f", "#ffffff")).grid(
+                row=0, column=0, columnspan=4, sticky="w", pady=(0, 4))
+
+        c0 = card(tab_basic)
+        c0.grid(row=0, column=0, sticky="ew", pady=(0, 8), padx=2)
+        section(c0, "注册配置")
+        add_label(c0, 1, 0, "邮箱服务商")
         self.email_provider_var = tk.StringVar(value=config.get("email_provider", "duckmail"))
-        self.email_provider_combo = tk_option_menu(
-            tab_basic, self.email_provider_var, ["duckmail", "yyds", "cloudflare", "cloudmail"], width=12
-        )
-        add_field(tab_basic, self.email_provider_combo, 0, 1, sticky=tk.W)
+        self.email_provider_combo = ctk.CTkOptionMenu(c0, values=["duckmail", "yyds", "cloudflare", "cloudmail"],
+                                                       variable=self.email_provider_var, width=120)
+        add_field(c0, self.email_provider_combo, 1, 1, sticky="w")
 
-        add_label(tab_basic, 0, 2, "数量/并发:")
-        count_frame = tk.Frame(tab_basic, bg=UI_PANEL_BG)
+        add_label(c0, 1, 2, "数量 / 并发")
+        count_frame = ctk.CTkFrame(c0, fg_color="transparent")
         self.count_var = tk.StringVar(value=str(config.get("register_count", 1)))
-        self.count_spinbox = tk.Spinbox(
-            count_frame,
-            from_=1,
-            to=2500,
-            width=6,
-            textvariable=self.count_var,
-            bg=UI_ENTRY_BG,
-            fg=UI_FG,
-            insertbackground=UI_FG,
-            buttonbackground=UI_BUTTON_BG,
-            disabledbackground="#2f2f2f",
-            disabledforeground=UI_MUTED_FG,
-            relief=tk.SOLID,
-        )
-        self.count_spinbox.pack(side=tk.LEFT)
-        tk_label(count_frame, text="并发", bg=UI_PANEL_BG).pack(side=tk.LEFT, padx=(8, 4))
+        self.count_spinbox = tk.Spinbox(count_frame, from_=1, to=2500, width=6,
+            textvariable=self.count_var, relief="flat", borderwidth=1, highlightthickness=0)
+        self.count_spinbox.pack(side="left")
+        ctk.CTkLabel(count_frame, text="并发", font=(_FONT_FAMILY, _FONT_LABEL),
+                      text_color=("#5a5a5a", "#bbbbbb")).pack(side="left", padx=(8, 4))
         self.workers_var = tk.StringVar(value=str(config.get("concurrent_workers", 1)))
-        self.workers_spinbox = tk.Spinbox(
-            count_frame,
-            from_=1,
-            to=8,
-            width=4,
-            textvariable=self.workers_var,
-            bg=UI_ENTRY_BG,
-            fg=UI_FG,
-            insertbackground=UI_FG,
-            buttonbackground=UI_BUTTON_BG,
-            disabledbackground="#2f2f2f",
-            disabledforeground=UI_MUTED_FG,
-            relief=tk.SOLID,
-        )
-        self.workers_spinbox.pack(side=tk.LEFT)
-        add_field(tab_basic, count_frame, 0, 3, sticky=tk.W)
+        self.workers_spinbox = tk.Spinbox(count_frame, from_=1, to=8, width=4,
+            textvariable=self.workers_var, relief="flat", borderwidth=1, highlightthickness=0)
+        self.workers_spinbox.pack(side="left")
+        add_field(c0, count_frame, 1, 3, sticky="w")
 
-        add_label(tab_basic, 1, 0, "注册选项:")
-        opt_frame = tk.Frame(tab_basic, bg=UI_PANEL_BG)
+        add_label(c0, 2, 0, "注册选项")
+        opt_frame = ctk.CTkFrame(c0, fg_color="transparent")
         self.nsfw_var = tk.BooleanVar(value=config.get("enable_nsfw", True))
-        self.nsfw_check = tk_checkbutton(
-            opt_frame, text="注册后开启 NSFW", variable=self.nsfw_var, bg=UI_PANEL_BG, activebackground=UI_PANEL_BG
-        )
-        self.nsfw_check.pack(side=tk.LEFT)
+        self.nsfw_check = ctk.CTkCheckBox(opt_frame, text="注册后开启 NSFW", variable=self.nsfw_var,
+                                            onvalue=True, offvalue=False)
+        self.nsfw_check.pack(side="left")
         self.browser_headless_var = tk.BooleanVar(value=bool(config.get("browser_headless", False)))
-        self.browser_headless_check = tk_checkbutton(
-            opt_frame, text="无头模式", variable=self.browser_headless_var, bg=UI_PANEL_BG, activebackground=UI_PANEL_BG
-        )
-        self.browser_headless_check.pack(side=tk.LEFT, padx=(12, 0))
-        add_field(tab_basic, opt_frame, 1, 1, sticky=tk.W)
+        self.browser_headless_check = ctk.CTkCheckBox(opt_frame, text="无头模式", variable=self.browser_headless_var,
+                                                        onvalue=True, offvalue=False)
+        self.browser_headless_check.pack(side="left", padx=(12, 0))
+        add_field(c0, opt_frame, 2, 1, sticky="w")
 
-        add_label(tab_basic, 1, 2, "代理（可选）:")
+        add_label(c0, 2, 2, "代理（可选）")
         self.proxy_var = tk.StringVar(value=config.get("proxy", ""))
-        self.proxy_entry = tk_entry(tab_basic, textvariable=self.proxy_var, width=34)
-        add_field(tab_basic, self.proxy_entry, 1, 3)
+        self.proxy_entry = ctk.CTkEntry(c0, textvariable=self.proxy_var, width=220)
+        add_field(c0, self.proxy_entry, 2, 3)
 
-        add_label(tab_basic, 2, 0, "代理池:")
+        c1 = card(tab_basic)
+        c1.grid(row=1, column=0, sticky="ew", pady=(0, 4), padx=2)
+        section(c1, "代理池")
+        add_label(c1, 1, 0, "代理池")
         self.proxy_pool_enabled_var = tk.BooleanVar(value=bool(config.get("proxy_pool_enabled", False)))
-        self.proxy_pool_enabled_check = tk_checkbutton(
-            tab_basic, text="启用", variable=self.proxy_pool_enabled_var, bg=UI_PANEL_BG, activebackground=UI_PANEL_BG
-        )
-        add_field(tab_basic, self.proxy_pool_enabled_check, 2, 1, sticky=tk.W)
+        self.proxy_pool_enabled_check = ctk.CTkCheckBox(c1, text="启用", variable=self.proxy_pool_enabled_var,
+                                                         onvalue=True, offvalue=False)
+        add_field(c1, self.proxy_pool_enabled_check, 1, 1, sticky="w")
 
-        add_label(tab_basic, 3, 0, "代理池列表:")
+        add_label(c1, 2, 0, "代理池列表")
         self.proxy_pool_var = tk.StringVar(value=config.get("proxy_pool", ""))
-        self.proxy_pool_entry = tk_entry(tab_basic, textvariable=self.proxy_pool_var, width=48)
-        add_field(tab_basic, self.proxy_pool_entry, 3, 1, columnspan=3)
+        self.proxy_pool_entry = ctk.CTkEntry(c1, textvariable=self.proxy_pool_var, width=400)
+        add_field(c1, self.proxy_pool_entry, 2, 1, columnspan=3)
 
-        # --- 邮箱 ---
-        add_label(tab_mail, 0, 0, "DuckMail API Key:")
+        c2 = card(tab_mail)
+        c2.grid(row=0, column=0, sticky="ew", pady=(0, 8), padx=2)
+        section(c2, "DuckMail")
+        add_label(c2, 1, 0, "API Key")
         self.api_key_var = tk.StringVar(value=config.get("duckmail_api_key", ""))
-        self.api_key_entry = tk_entry(tab_mail, textvariable=self.api_key_var, width=72)
-        add_field(tab_mail, self.api_key_entry, 0, 1, columnspan=3)
+        self.api_key_entry = ctk.CTkEntry(c2, textvariable=self.api_key_var, width=500)
+        add_field(c2, self.api_key_entry, 1, 1, columnspan=3)
 
-        add_label(tab_mail, 1, 0, "Cloudflare 鉴权模式:")
+        c3 = card(tab_mail)
+        c3.grid(row=1, column=0, sticky="ew", pady=(0, 8), padx=2)
+        section(c3, "Cloudflare")
+        add_label(c3, 1, 0, "鉴权模式")
         self.cloudflare_auth_mode_var = tk.StringVar(value=config.get("cloudflare_auth_mode", "none"))
-        self.cloudflare_auth_mode_combo = tk_option_menu(
-            tab_mail, self.cloudflare_auth_mode_var, ["query-key", "bearer", "x-api-key", "x-admin-auth", "none"], width=12
-        )
-        add_field(tab_mail, self.cloudflare_auth_mode_combo, 1, 1, sticky=tk.W)
+        self.cloudflare_auth_mode_combo = ctk.CTkOptionMenu(c3, values=["query-key", "bearer", "x-api-key", "x-admin-auth", "none"],
+                                                             variable=self.cloudflare_auth_mode_var, width=120)
+        add_field(c3, self.cloudflare_auth_mode_combo, 1, 1, sticky="w")
+        add_label(c3, 1, 2, "CF 路径")
+        self.cloudflare_paths_var = tk.StringVar(value=",".join([config.get("cloudflare_path_domains", "/api/domains"), config.get("cloudflare_path_accounts", "/api/new_address"), config.get("cloudflare_path_token", "/api/token"), config.get("cloudflare_path_messages", "/api/mails")]))
+        self.cloudflare_paths_entry = ctk.CTkEntry(c3, textvariable=self.cloudflare_paths_var, width=220)
+        add_field(c3, self.cloudflare_paths_entry, 1, 3)
 
-        add_label(tab_mail, 1, 2, "CF 路径:")
-        self.cloudflare_paths_var = tk.StringVar(
-            value=",".join(
-                [
-                    config.get("cloudflare_path_domains", "/api/domains"),
-                    config.get("cloudflare_path_accounts", "/api/new_address"),
-                    config.get("cloudflare_path_token", "/api/token"),
-                    config.get("cloudflare_path_messages", "/api/mails"),
-                ]
-            )
-        )
-        self.cloudflare_paths_entry = tk_entry(tab_mail, textvariable=self.cloudflare_paths_var, width=34)
-        add_field(tab_mail, self.cloudflare_paths_entry, 1, 3)
-
-        add_label(tab_mail, 2, 0, "Cloudflare API Base:")
+        add_label(c3, 2, 0, "API Base")
         self.cloudflare_api_base_var = tk.StringVar(value=config.get("cloudflare_api_base", ""))
-        self.cloudflare_api_base_entry = tk_entry(tab_mail, textvariable=self.cloudflare_api_base_var, width=72)
-        add_field(tab_mail, self.cloudflare_api_base_entry, 2, 1, columnspan=3)
+        self.cloudflare_api_base_entry = ctk.CTkEntry(c3, textvariable=self.cloudflare_api_base_var, width=500)
+        add_field(c3, self.cloudflare_api_base_entry, 2, 1, columnspan=3)
 
-        add_label(tab_mail, 3, 0, "Cloudflare API Key:")
+        add_label(c3, 3, 0, "API Key")
         self.cloudflare_api_key_var = tk.StringVar(value=config.get("cloudflare_api_key", ""))
-        self.cloudflare_api_key_entry = tk_entry(tab_mail, textvariable=self.cloudflare_api_key_var, width=34)
-        add_field(tab_mail, self.cloudflare_api_key_entry, 3, 1)
+        self.cloudflare_api_key_entry = ctk.CTkEntry(c3, textvariable=self.cloudflare_api_key_var, width=220)
+        add_field(c3, self.cloudflare_api_key_entry, 3, 1)
 
-        add_label(tab_mail, 4, 0, "Cloud Mail API Base:")
+        c4 = card(tab_mail)
+        c4.grid(row=2, column=0, sticky="ew", pady=(0, 4), padx=2)
+        section(c4, "Cloud Mail")
+        add_label(c4, 1, 0, "API Base")
         self.cloudmail_api_base_var = tk.StringVar(value=config.get("cloudmail_api_base", ""))
-        self.cloudmail_api_base_entry = tk_entry(tab_mail, textvariable=self.cloudmail_api_base_var, width=34)
-        add_field(tab_mail, self.cloudmail_api_base_entry, 4, 1)
-
-        add_label(tab_mail, 4, 2, "Cloud Mail 域名:")
+        self.cloudmail_api_base_entry = ctk.CTkEntry(c4, textvariable=self.cloudmail_api_base_var, width=220)
+        add_field(c4, self.cloudmail_api_base_entry, 1, 1)
+        add_label(c4, 1, 2, "域名")
         self.cloudmail_domains_var = tk.StringVar(value=config.get("cloudmail_domains", ""))
-        self.cloudmail_domains_entry = tk_entry(tab_mail, textvariable=self.cloudmail_domains_var, width=34)
-        add_field(tab_mail, self.cloudmail_domains_entry, 4, 3)
+        self.cloudmail_domains_entry = ctk.CTkEntry(c4, textvariable=self.cloudmail_domains_var, width=220)
+        add_field(c4, self.cloudmail_domains_entry, 1, 3)
 
-        add_label(tab_mail, 5, 0, "Cloud Mail Public Token:")
+        add_label(c4, 2, 0, "Public Token")
         self.cloudmail_public_token_var = tk.StringVar(value=config.get("cloudmail_public_token", ""))
-        self.cloudmail_public_token_entry = tk_entry(tab_mail, textvariable=self.cloudmail_public_token_var, width=72)
-        add_field(tab_mail, self.cloudmail_public_token_entry, 5, 1, columnspan=3)
+        self.cloudmail_public_token_entry = ctk.CTkEntry(c4, textvariable=self.cloudmail_public_token_var, width=500)
+        add_field(c4, self.cloudmail_public_token_entry, 2, 1, columnspan=3)
 
-        # --- 入池 ---
-        add_label(tab_pool, 0, 0, "grok2api 本地入池:")
+        c5 = card(tab_pool)
+        c5.grid(row=0, column=0, sticky="ew", pady=(0, 8), padx=2)
+        section(c5, "本地池")
+        add_label(c5, 1, 0, "grok2api 本地入池")
         self.grok2api_local_auto_var = tk.BooleanVar(value=bool(config.get("grok2api_auto_add_local", True)))
-        self.grok2api_local_auto_check = tk_checkbutton(
-            tab_pool, text="启用", variable=self.grok2api_local_auto_var, bg=UI_PANEL_BG, activebackground=UI_PANEL_BG
-        )
-        add_field(tab_pool, self.grok2api_local_auto_check, 0, 1, sticky=tk.W)
-
-        add_label(tab_pool, 0, 2, "grok2api 池名:")
+        self.grok2api_local_auto_check = ctk.CTkCheckBox(c5, text="启用", variable=self.grok2api_local_auto_var,
+                                                          onvalue=True, offvalue=False)
+        add_field(c5, self.grok2api_local_auto_check, 1, 1, sticky="w")
+        add_label(c5, 1, 2, "池名")
         self.grok2api_pool_name_var = tk.StringVar(value=str(config.get("grok2api_pool_name", "ssoBasic")))
-        self.grok2api_pool_name_combo = tk_option_menu(
-            tab_pool, self.grok2api_pool_name_var, ["ssoBasic", "ssoSuper"], width=12
-        )
-        add_field(tab_pool, self.grok2api_pool_name_combo, 0, 3, sticky=tk.W)
+        self.grok2api_pool_name_combo = ctk.CTkOptionMenu(c5, values=["ssoBasic", "ssoSuper"],
+                                                           variable=self.grok2api_pool_name_var, width=120)
+        add_field(c5, self.grok2api_pool_name_combo, 1, 3, sticky="w")
 
-        add_label(tab_pool, 1, 0, "本地 token.json:")
+        add_label(c5, 2, 0, "本地 token.json")
         self.grok2api_local_file_var = tk.StringVar(value=str(config.get("grok2api_local_token_file", "")))
-        self.grok2api_local_file_entry = tk_entry(tab_pool, textvariable=self.grok2api_local_file_var, width=72)
-        add_field(tab_pool, self.grok2api_local_file_entry, 1, 1, columnspan=3)
+        self.grok2api_local_file_entry = ctk.CTkEntry(c5, textvariable=self.grok2api_local_file_var, width=500)
+        add_field(c5, self.grok2api_local_file_entry, 2, 1, columnspan=3)
 
-        add_label(tab_pool, 2, 0, "grok2api 远端入池:")
+        c6 = card(tab_pool)
+        c6.grid(row=1, column=0, sticky="ew", pady=(0, 4), padx=2)
+        section(c6, "远端池")
+        add_label(c6, 1, 0, "grok2api 远端入池")
         self.grok2api_remote_auto_var = tk.BooleanVar(value=bool(config.get("grok2api_auto_add_remote", False)))
-        self.grok2api_remote_auto_check = tk_checkbutton(
-            tab_pool, text="启用", variable=self.grok2api_remote_auto_var, bg=UI_PANEL_BG, activebackground=UI_PANEL_BG
-        )
-        add_field(tab_pool, self.grok2api_remote_auto_check, 2, 1, sticky=tk.W)
+        self.grok2api_remote_auto_check = ctk.CTkCheckBox(c6, text="启用", variable=self.grok2api_remote_auto_var,
+                                                           onvalue=True, offvalue=False)
+        add_field(c6, self.grok2api_remote_auto_check, 1, 1, sticky="w")
 
-        add_label(tab_pool, 3, 0, "grok2api 远端 Base:")
+        add_label(c6, 2, 0, "远端 Base")
         self.grok2api_remote_base_var = tk.StringVar(value=str(config.get("grok2api_remote_base", "")))
-        self.grok2api_remote_base_entry = tk_entry(tab_pool, textvariable=self.grok2api_remote_base_var, width=72)
-        add_field(tab_pool, self.grok2api_remote_base_entry, 3, 1, columnspan=3)
+        self.grok2api_remote_base_entry = ctk.CTkEntry(c6, textvariable=self.grok2api_remote_base_var, width=500)
+        add_field(c6, self.grok2api_remote_base_entry, 2, 1, columnspan=3)
 
-        add_label(tab_pool, 4, 0, "grok2api 远端 app_key:")
+        add_label(c6, 3, 0, "远端 app_key")
         self.grok2api_remote_key_var = tk.StringVar(value=str(config.get("grok2api_remote_app_key", "")))
-        self.grok2api_remote_key_entry = tk_entry(tab_pool, textvariable=self.grok2api_remote_key_var, width=72)
-        add_field(tab_pool, self.grok2api_remote_key_entry, 4, 1, columnspan=3)
+        self.grok2api_remote_key_entry = ctk.CTkEntry(c6, textvariable=self.grok2api_remote_key_var, width=500)
+        add_field(c6, self.grok2api_remote_key_entry, 3, 1, columnspan=3)
 
-        # --- CPA ---
-        add_label(tab_cpa, 0, 0, "OIDC / CPA:")
+        c7 = card(tab_cpa)
+        c7.grid(row=0, column=0, sticky="ew", pady=(0, 8), padx=2)
+        section(c7, "导出设置")
+        add_label(c7, 1, 0, "OIDC / CPA")
         self.cpa_export_var = tk.BooleanVar(value=bool(config.get("cpa_export_enabled", False)))
-        self.cpa_export_check = tk_checkbutton(
-            tab_cpa,
-            text="注册成功后导出 CPA xAI OIDC",
-            variable=self.cpa_export_var,
-            bg=UI_PANEL_BG,
-            activebackground=UI_PANEL_BG,
-        )
-        add_field(tab_cpa, self.cpa_export_check, 0, 1, sticky=tk.W)
+        self.cpa_export_check = ctk.CTkCheckBox(c7, text="注册成功后导出 CPA xAI OIDC",
+                                                 variable=self.cpa_export_var, onvalue=True, offvalue=False)
+        add_field(c7, self.cpa_export_check, 1, 1, sticky="w")
 
-        add_label(tab_cpa, 1, 0, "CPA 输出目录:")
+        add_label(c7, 2, 0, "输出目录")
         self.cpa_auth_dir_var = tk.StringVar(value=str(config.get("cpa_auth_dir", "./cpa_auths")))
-        self.cpa_auth_dir_entry = tk_entry(tab_cpa, textvariable=self.cpa_auth_dir_var, width=72)
-        add_field(tab_cpa, self.cpa_auth_dir_entry, 1, 1, columnspan=3)
+        self.cpa_auth_dir_entry = ctk.CTkEntry(c7, textvariable=self.cpa_auth_dir_var, width=500)
+        add_field(c7, self.cpa_auth_dir_entry, 2, 1, columnspan=3)
 
-        add_label(tab_cpa, 2, 0, "9Router Grok CLI:")
+        c8 = card(tab_cpa)
+        c8.grid(row=1, column=0, sticky="ew", pady=(0, 4), padx=2)
+        section(c8, "9Router Grok CLI")
+        add_label(c8, 1, 0, "自动添加")
         self.grok2api_grok_cli_var = tk.BooleanVar(value=bool(config.get("grok2api_auto_add_grok_cli", False)))
-        self.grok2api_grok_cli_check = tk_checkbutton(
-            tab_cpa,
-            text="注册后自动添加到 9Router Grok CLI",
-            variable=self.grok2api_grok_cli_var,
-            bg=UI_PANEL_BG,
-            activebackground=UI_PANEL_BG,
-        )
-        add_field(tab_cpa, self.grok2api_grok_cli_check, 2, 1, sticky=tk.W)
+        self.grok2api_grok_cli_check = ctk.CTkCheckBox(c8, text="注册后自动添加到 9Router Grok CLI",
+                                                        variable=self.grok2api_grok_cli_var, onvalue=True, offvalue=False)
+        add_field(c8, self.grok2api_grok_cli_check, 1, 1, sticky="w")
 
-        add_label(tab_cpa, 3, 0, "9Router DB 路径:")
+        add_label(c8, 2, 0, "DB 路径")
         self.grok2api_9router_db_var = tk.StringVar(value=str(config.get("grok2api_9router_db_path", "")))
-        self.grok2api_9router_db_entry = tk_entry(tab_cpa, textvariable=self.grok2api_9router_db_var, width=72)
-        add_field(tab_cpa, self.grok2api_9router_db_entry, 3, 1, columnspan=3)
+        self.grok2api_9router_db_entry = ctk.CTkEntry(c8, textvariable=self.grok2api_9router_db_var, width=500)
+        add_field(c8, self.grok2api_9router_db_entry, 2, 1, columnspan=3)
 
-        btn_frame = tk.Frame(main_frame, bg=UI_BG)
-        btn_frame.grid(row=1, column=0, sticky=tk.EW, pady=(0, 6))
-        self.start_btn = tk_button(btn_frame, text="开始注册", command=self.start_registration)
-        self.start_btn.pack(side=tk.LEFT, padx=5)
-        self.stop_btn = tk_button(btn_frame, text="停止", command=self.stop_registration, state=tk.DISABLED)
-        self.stop_btn.pack(side=tk.LEFT, padx=5)
-        self.clear_btn = tk_button(btn_frame, text="清空日志", command=self.clear_log)
-        self.clear_btn.pack(side=tk.LEFT, padx=5)
+        btn_frame = ctk.CTkFrame(self.root, fg_color="transparent")
+        btn_frame.grid(row=2, column=0, sticky="ew", padx=12, pady=(8, 0))
+        self.start_btn = ctk.CTkButton(btn_frame, text="开始注册", command=self.start_registration, width=100)
+        self.start_btn.pack(side="left")
+        self.stop_btn = ctk.CTkButton(btn_frame, text="停止", command=self.stop_registration,
+                                       state="disabled", width=70, fg_color="#86868b",
+                                       hover_color="#6e6e72")
+        self.stop_btn.pack(side="left", padx=(6, 0))
 
-        status_frame = tk.Frame(main_frame, bg=UI_BG)
-        status_frame.grid(row=2, column=0, sticky=tk.EW, pady=(0, 6))
         self.status_var = tk.StringVar(value="就绪")
-        tk_label(status_frame, text="状态: ").pack(side=tk.LEFT)
-        self.status_label = tk.Label(status_frame, textvariable=self.status_var, bg=UI_BG, fg="green")
-        self.status_label.pack(side=tk.LEFT)
+        self.status_label = ctk.CTkLabel(btn_frame, textvariable=self.status_var,
+                                          font=(_FONT_FAMILY, _FONT_STATS, "bold"),
+                                          text_color="#34c759")
+        self.status_label.pack(side="left", padx=(16, 0))
+
         self.stats_var = tk.StringVar(value="成功: 0 | 失败: 0 | CPA: 0 | 待恢复: 0 | 后处理警告: 0")
-        tk.Label(status_frame, textvariable=self.stats_var, bg=UI_BG, fg=UI_FG).pack(side=tk.RIGHT)
-        log_frame = tk.LabelFrame(
-            main_frame,
-            text="日志",
-            bg=UI_PANEL_BG,
-            fg=UI_FG,
-            padx=5,
-            pady=5,
-            relief=tk.GROOVE,
-            borderwidth=1,
-        )
-        log_frame.grid(row=3, column=0, sticky=tk.NSEW)
+        ctk.CTkLabel(btn_frame, textvariable=self.stats_var,
+                      font=(_FONT_FAMILY, _FONT_STATS),
+                      text_color=("#86868b", "#aaaaaa")).pack(side="left", padx=(12, 0))
+
+        self.clear_btn = ctk.CTkButton(btn_frame, text="清空日志", command=self.clear_log,
+                                        width=70, fg_color="#86868b", hover_color="#6e6e72")
+        self.clear_btn.pack(side="right")
+
+        log_frame = ctk.CTkFrame(self.root, fg_color=("white", "#2b2b2b"), border_width=1,
+                                 border_color=("#e5e5ea", "#3a3a3a"))
+        log_frame.grid(row=3, column=0, sticky="nsew", padx=12, pady=(6, 12))
         log_frame.grid_columnconfigure(0, weight=1)
         log_frame.grid_rowconfigure(0, weight=1)
-        self.log_text = scrolledtext.ScrolledText(
-            log_frame,
-            height=18,
-            width=60,
-            bg="#111111",
-            fg="#f5f5f5",
-            insertbackground="#f5f5f5",
-            selectbackground="#345a8a",
-            selectforeground="#ffffff",
-            relief=tk.SOLID,
-            borderwidth=1,
-            highlightthickness=1,
-            highlightbackground="#555555",
-        )
-        self.log_text.grid(row=0, column=0, sticky=tk.NSEW)
+        self.log_text = ctk.CTkTextbox(log_frame, font=(_MONO_FAMILY, _FONT_MONO),
+                                        fg_color=("white", "#2b2b2b"),
+                                        text_color=("#1d1d1f", "#e0e0e0"),
+                                        border_width=0)
+        self.log_text.grid(row=0, column=0, sticky="nsew")
         self.log("[*] GUI 已就绪，配置已加载")
         self.log(f"[*] 当前邮箱服务商: {self.email_provider_var.get()} | 注册数量: {self.count_var.get()}")
 
@@ -996,18 +866,18 @@ class GrokRegisterGUI:
                 kind = event[0]
                 if kind == "log":
                     line = event[1]
-                    self.log_text.insert(tk.END, f"{line}\n")
-                    self.log_text.see(tk.END)
+                    self.log_text.insert("end", f"{line}\n")
+                    self.log_text.see("end")
                 elif kind == "clear_log":
-                    self.log_text.delete(1.0, tk.END)
+                    self.log_text.delete("1.0", "end")
                 elif kind == "stats":
                     self.stats_var.set(f"成功: {event[1]} | 失败: {event[2]} | CPA: {event[5]} | 待恢复: {event[3]} | 后处理警告: {event[4]}")
                 elif kind == "running":
                     running = bool(event[1])
-                    self.start_btn.config(state=tk.DISABLED if running else tk.NORMAL)
-                    self.stop_btn.config(state=tk.NORMAL if running else tk.DISABLED)
+                    self.start_btn.configure(state="disabled" if running else "normal")
+                    self.stop_btn.configure(state="normal" if running else "disabled")
                     self.status_var.set("运行中..." if running else "就绪")
-                    self.status_label.config(foreground="blue" if running else "green")
+                    self.status_label.configure(text_color=("#0071e3" if running else "#34c759"))
                 elif kind == "error":
                     messagebox.showerror(event[1], event[2])
         except queue.Empty:
@@ -1227,6 +1097,35 @@ def main_cli():
 
 
 def main():
+    if len(sys.argv) > 1 and sys.argv[1].strip().lower() == "merge-accounts":
+        args = sys.argv[2:]
+        if not args:
+            print("用法: python grok_register_ttk.py merge-accounts <文件1> <文件2> ... [-o 输出文件]", file=sys.stderr)
+            return
+        output = None
+        inputs = []
+        skip_next = False
+        for i, arg in enumerate(args):
+            if skip_next:
+                skip_next = False
+                continue
+            if arg == "-o" and i + 1 < len(args):
+                output = args[i + 1]
+                skip_next = True
+                continue
+            inputs.append(arg)
+        if not inputs:
+            print("[!] 未指定输入文件", file=sys.stderr)
+            return
+        try:
+            summary = merge_account_files(inputs, output=output)
+            msg = f"[*] 合并完成: 总计 {summary['total']} | 唯一 {summary['unique']} | 重复跳过 {summary['duplicates_skipped']}"
+            if summary["output"]:
+                msg += f" | 输出 {summary['output']}"
+            cli_log(msg)
+        except Exception as exc:
+            log_exception("合并失败", exc, cli_log)
+        return
     if len(sys.argv) > 1 and sys.argv[1].strip().lower() == "retry-pending":
         if len(sys.argv) < 3:
             print("用法: python grok_register_ttk.py retry-pending <pending文件> [输出文件]", file=sys.stderr)
@@ -1247,11 +1146,12 @@ def main():
         main_cli()
         return
     if not TK_AVAILABLE:
-        print(f"[!] GUI 模式需要 Tkinter，但当前环境不可用: {TK_IMPORT_ERROR}", file=sys.stderr)
+        print("[!] GUI 模式需要 customtkinter，但当前环境不可用", file=sys.stderr)
         print("[*] 可改用 CLI 模式: python grok_register_ttk.py cli", file=sys.stderr)
         return
-    root = tk.Tk()
-    setup_light_theme(root)
+    ctk.set_appearance_mode("light")
+    ctk.set_default_color_theme("blue")
+    root = ctk.CTk()
     try:
         app = GrokRegisterGUI(root)
     except ConfigError as exc:
